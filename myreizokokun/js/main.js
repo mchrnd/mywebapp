@@ -324,25 +324,25 @@ function render() {
                         ${item.note ? `<p class="text-xs text-slate-500 mt-1 flex items-center gap-1"><i data-lucide="sticky-note" class="w-3 h-3 inline"></i> ${escapeHtml(item.note)}</p>` : ''}
                     </div>
                     <div class="flex items-center gap-1">
-                        <button onclick="window.openEditModal('${item.id}')" class="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-slate-50 rounded-lg transition" title="編集">
+                        <button onclick="window.openEditModal('${item.id}')" class="p-2 text-slate-400 hover:text-emerald-600 hover:bg-slate-50 rounded-lg transition" title="編集">
                             <i data-lucide="edit-3" class="w-4 h-4"></i>
                         </button>
-                        <button onclick="window.deleteItem('${item.id}')" class="p-1.5 text-slate-400 hover:text-red-600 hover:bg-slate-50 rounded-lg transition" title="削除">
+                        <button onclick="window.deleteItem('${item.id}')" class="p-2 text-slate-400 hover:text-red-600 hover:bg-slate-50 rounded-lg transition" title="削除">
                             <i data-lucide="trash-2" class="w-4 h-4"></i>
                         </button>
                     </div>
                 </div>
 
-                <div class="pt-2 border-t border-slate-100 flex items-center justify-between">
+                <div class="pt-2 border-t border-slate-100 flex items-center justify-between flex-wrap gap-2">
                     <div class="text-xs text-slate-500">
                         賞味期限: <span class="font-semibold text-slate-700">${item.expiry}</span>
                     </div>
                     <div class="flex items-center gap-2 bg-slate-50 p-1 rounded-lg border border-slate-200">
                         <span class="text-xs font-semibold text-slate-500 pl-1">残数:</span>
                         <div class="flex items-center">
-                            <button onclick="window.updateQuantity('${item.id}', -1)" class="w-6 h-6 rounded bg-white hover:bg-slate-200 text-slate-700 font-bold flex items-center justify-center text-xs shadow-xs border border-slate-200 active:scale-95 transition">-</button>
-                            <span class="w-12 text-center text-sm font-bold text-slate-800">${item.quantity} <span class="text-xs font-normal text-slate-500">${escapeHtml(item.unit)}</span></span>
-                            <button onclick="window.updateQuantity('${item.id}', 1)" class="w-6 h-6 rounded bg-white hover:bg-slate-200 text-slate-700 font-bold flex items-center justify-center text-xs shadow-xs border border-slate-200 active:scale-95 transition">+</button>
+                            <button onclick="window.updateQuantity('${item.id}', -1)" class="w-8 h-8 sm:w-6 sm:h-6 rounded bg-white hover:bg-slate-200 text-slate-700 font-bold flex items-center justify-center text-xs shadow-xs border border-slate-200 active:scale-95 transition">-</button>
+                            <span class="w-14 sm:w-12 text-center text-sm font-bold text-slate-800">${item.quantity} <span class="text-xs font-normal text-slate-500">${escapeHtml(item.unit)}</span></span>
+                            <button onclick="window.updateQuantity('${item.id}', 1)" class="w-8 h-8 sm:w-6 sm:h-6 rounded bg-white hover:bg-slate-200 text-slate-700 font-bold flex items-center justify-center text-xs shadow-xs border border-slate-200 active:scale-95 transition">+</button>
                         </div>
                     </div>
                 </div>
@@ -527,6 +527,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('open-add-modal-btn').addEventListener('click', () => openModal());
     document.getElementById('empty-add-btn').addEventListener('click', () => openModal());
+    document.getElementById('fab-add-btn').addEventListener('click', () => openModal());
     document.getElementById('close-modal-btn').addEventListener('click', closeModal);
     document.getElementById('cancel-modal-btn').addEventListener('click', closeModal);
 
