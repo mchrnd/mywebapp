@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>スマート冷蔵庫チェッカー</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col antialiased">
+
+    <!-- ヘッダー -->
+    <header class="bg-emerald-600 text-white shadow-md sticky top-0 z-20">
+        <div class="max-w-4xl mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center gap-2">
+                <i data-lucide="refrigerator" class="w-7 h-7"></i>
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight leading-tight">スマート冷蔵庫チェッカー</h1>
+                    <div id="sync-status" class="text-xs text-emerald-100 flex items-center gap-1">
+                        <i data-lucide="cloud-off" class="w-3 h-3"></i> 接続確認中...
+                    </div>
+                </div>
+            </div>
+            <!-- Googleログイン / ユーザープロファイル表示エリア -->
+            <div class="flex items-center gap-2">
+                <!-- 未ログイン時：Googleログインボタン -->
+                <button id="google-login-btn" class="hidden bg-emerald-700 hover:bg-emerald-800 text-white text-xs px-3 py-1.5 rounded-lg flex items-center gap-1.5 border border-emerald-500 transition shadow-xs">
+                    <i data-lucide="log-in" class="w-3.5 h-3.5"></i>
+                    <span>Googleでログイン</span>
+                </button>
+
+                <!-- ログイン時：ユーザー情報＆ログアウト -->
+                <div id="user-profile" class="hidden flex items-center gap-2 bg-emerald-700/60 pl-2.5 pr-1.5 py-1 rounded-lg border border-emerald-500/50">
+                    <div class="text-right leading-tight">
+                        <div id="user-name" class="text-xs font-bold text-white truncate max-w-[120px]">ユーザー</div>
+                        <div id="user-email" class="text-[10px] text-emerald-100 truncate max-w-[120px]"></div>
+                    </div>
+                    <button id="logout-btn" class="p-1 text-emerald-100 hover:text-white hover:bg-emerald-800 rounded transition" title="ログアウト">
+                        <i data-lucide="log-out" class="w-4 h-4"></i>
+                    </button>
+                </div>
+
+                <button id="open-add-modal-btn" class="bg-white text-emerald-700 hover:bg-emerald-50 active:scale-95 transition px-3 py-1.5 rounded-lg text-sm font-semibold flex items-center gap-1.5 shadow-sm">
+                    <i data-lucide="plus" class="w-4 h-4"></i>
+                    <span>食材を追加</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- メインコンテンツ -->
+    <main class="max-w-4xl mx-auto w-full px-4 py-6 flex-1 flex flex-col gap-6 relative">
+
+        <!-- 未ログイン時のオーバーレイ案内 -->
+        <div id="auth-required-overlay" class="hidden absolute inset-0 bg-slate-50/90 backdrop-blur-xs z-10 flex flex-col items-center justify-center p-6 text-center">
+            <div class="bg-white p-6 rounded-2xl shadow-lg border border-slate-200 max-w-sm w-full flex flex-col items-center gap-3">
+                <div class="p-3 bg-emerald-100 text-emerald-600 rounded-full">
+                    <i data-lucide="lock" class="w-8 h-8"></i>
+                </div>
+                <h2 class="text-lg font-bold text-slate-800">ログインが必要です</h2>
+                <p class="text-xs text-slate-500">冷蔵庫の食材データを同期・管理するにはGoogleアカウントでログインしてください。</p>
+                <button id="overlay-login-btn" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 px-4 rounded-xl text-sm transition flex items-center justify-center gap-2 shadow-sm">
+                    <i data-lucide="log-in" class="w-4 h-4"></i> Googleでログイン
+                </button>
+            </div>
+        </div>
+
+        <!-- 警告・サマリーカード -->
+        <div id="summary-section" class="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div class="bg-white p-3.5 rounded-xl border border-red-100 shadow-sm flex items-center gap-3">
+                <div class="p-2.5 rounded-lg bg-red-100 text-red-600">
+                    <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <p class="text-xs text-slate-500 font-medium">期限切れ</p>
+                    <p id="count-expired" class="text-xl font-bold text-red-600">0</p>
+                </div>
+            </div>
+            <div class="bg-white p-3.5 rounded-xl border border-amber-100 shadow-sm flex items-center gap-3">
+                <div class="p-2.5 rounded-lg bg-amber-100 text-amber-600">
+                    <i data-lucide="clock" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <p class="text-xs text-slate-500 font-medium">今日・明日まで</p>
+                    <p id="count-warning" class="text-xl font-bold text-amber-600">0</p>
+                </div>
+            </div>
+            <div class="bg-white p-3.5 rounded-xl border border-blue-100 shadow-sm flex items-center gap-3">
+                <div class="p-2.5 rounded-lg bg-blue-100 text-blue-600">
+                    <i data-lucide="calendar" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <p class="text-xs text-slate-500 font-medium">そろそろ消費</p>
+                    <p id="count-soon" class="text-xl font-bold text-blue-600">0</p>
+                </div>
+            </div>
+            <div class="bg-white p-3.5 rounded-xl border border-emerald-100 shadow-sm flex items-center gap-3">
+                <div class="p-2.5 rounded-lg bg-emerald-100 text-emerald-600">
+                    <i data-lucide="package" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <p class="text-xs text-slate-500 font-medium">総アイテム数</p>
+                    <p id="count-total" class="text-xl font-bold text-emerald-700">0</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 検索・フィルター・並び替えコントロール -->
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
+            <div class="flex flex-col sm:flex-row gap-3">
+                <!-- 検索バー -->
+                <div class="relative flex-1">
+                    <i data-lucide="search" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                    <input type="text" id="search-input" placeholder="食材名で検索..." class="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent">
+                </div>
+                <!-- 並び替え -->
+                <div class="flex items-center gap-2">
+                    <label for="sort-select" class="text-xs font-semibold text-slate-500 whitespace-nowrap">並び替え:</label>
+                    <select id="sort-select" class="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                        <option value="expiry-asc">賞味期限（近い順）</option>
+                        <option value="expiry-desc">賞味期限（遠い順）</option>
+                        <option value="quantity-asc">残数（少ない順）</option>
+                        <option value="quantity-desc">残数（多い順）</option>
+                        <option value="name-asc">名前順</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- カテゴリタブ -->
+            <div class="flex items-center gap-1.5 overflow-x-auto pb-1 pt-1 -mx-1 px-1 text-sm scrollbar-none" id="category-tabs">
+                <button data-category="all" class="category-btn px-3 py-1.5 rounded-full font-medium whitespace-nowrap bg-emerald-600 text-white shadow-sm">すべて</button>
+                <button data-category="野菜・果物" class="category-btn px-3 py-1.5 rounded-full font-medium whitespace-nowrap bg-slate-100 text-slate-600 hover:bg-slate-200">🥬 野菜・果物</button>
+                <button data-category="肉・魚" class="category-btn px-3 py-1.5 rounded-full font-medium whitespace-nowrap bg-slate-100 text-slate-600 hover:bg-slate-200">🍖 肉・魚</button>
+                <button data-category="乳製品・卵" class="category-btn px-3 py-1.5 rounded-full font-medium whitespace-nowrap bg-slate-100 text-slate-600 hover:bg-slate-200">🥚 乳製品・卵</button>
+                <button data-category="加工食品・惣菜" class="category-btn px-3 py-1.5 rounded-full font-medium whitespace-nowrap bg-slate-100 text-slate-600 hover:bg-slate-200">🍱 惣菜・冷凍</button>
+                <button data-category="調味料・その他" class="category-btn px-3 py-1.5 rounded-full font-medium whitespace-nowrap bg-slate-100 text-slate-600 hover:bg-slate-200">🍶 調味料・他</button>
+            </div>
+        </div>
+
+        <!-- 食材一覧リスト -->
+        <div id="item-list" class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+            <!-- JavaScriptで動的にカードを差し込み -->
+        </div>
+
+        <!-- 空状態のメッセージ -->
+        <div id="empty-state" class="hidden flex-col items-center justify-center py-12 px-4 text-center bg-white rounded-2xl border border-dashed border-slate-300">
+            <div class="w-16 h-16 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mb-3">
+                <i data-lucide="shopping-bag" class="w-8 h-8"></i>
+            </div>
+            <h3 class="text-lg font-bold text-slate-700 mb-1">食材が見つかりません</h3>
+            <p class="text-sm text-slate-500 mb-4" id="empty-message">冷蔵庫の中に食材を登録してみましょう！</p>
+            <button id="empty-add-btn" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-4 py-2 rounded-lg text-sm transition shadow-sm flex items-center gap-2">
+                <i data-lucide="plus" class="w-4 h-4"></i> 食材を追加する
+            </button>
+        </div>
+
+    </main>
+
+    <!-- モーダル: 新規追加 / 編集 -->
+    <div id="item-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl relative animate-in fade-in zoom-in-95 duration-150">
+            <button id="close-modal-btn" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1 rounded-lg">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+            <h2 id="modal-title" class="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                <i data-lucide="plus-circle" class="w-5 h-5 text-emerald-600"></i> 食材を追加
+            </h2>
+
+            <form id="item-form" class="space-y-4">
+                <input type="hidden" id="item-id">
+
+                <!-- 品名 -->
+                <div>
+                    <label for="item-name" class="block text-xs font-bold text-slate-700 mb-1">食材名 <span class="text-red-500">*</span></label>
+                    <input type="text" id="item-name" required placeholder="例: 牛乳、卵、キャベツ" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                </div>
+
+                <!-- カテゴリ ＆ 保存場所 -->
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label for="item-category" class="block text-xs font-bold text-slate-700 mb-1">カテゴリ</label>
+                        <select id="item-category" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                            <option value="野菜・果物">🥬 野菜・果物</option>
+                            <option value="肉・魚">🍖 肉・魚</option>
+                            <option value="乳製品・卵">🥚 乳製品・卵</option>
+                            <option value="加工食品・惣菜">🍱 惣菜・冷凍</option>
+                            <option value="調味料・その他">🍶 調味料・他</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="item-location" class="block text-xs font-bold text-slate-700 mb-1">保存場所</label>
+                        <select id="item-location" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                            <option value="冷蔵">❄️ 冷蔵室</option>
+                            <option value="野菜室">🥬 野菜室</option>
+                            <option value="冷凍">🧊 冷凍室</option>
+                            <option value="ドアポケット">🚪 ドアポケット</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- 賞味期限 -->
+                <div>
+                    <label for="item-expiry" class="block text-xs font-bold text-slate-700 mb-1">賞味／消費期限 <span class="text-red-500">*</span></label>
+                    <input type="date" id="item-expiry" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                </div>
+
+                <!-- 数量 ＆ 単位 -->
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label for="item-quantity" class="block text-xs font-bold text-slate-700 mb-1">数量</label>
+                        <div class="flex items-center">
+                            <button type="button" id="qty-minus-btn" class="px-2.5 py-2 border border-r-0 border-slate-300 rounded-l-lg bg-slate-50 hover:bg-slate-100 font-bold text-slate-600">-</button>
+                            <input type="number" id="item-quantity" min="0" step="0.5" value="1" required class="w-full px-2 py-2 border-t border-b border-slate-300 text-center text-sm focus:outline-none">
+                            <button type="button" id="qty-plus-btn" class="px-2.5 py-2 border border-l-0 border-slate-300 rounded-r-lg bg-slate-50 hover:bg-slate-100 font-bold text-slate-600">+</button>
+                        </div>
+                    </div>
+                    <div>
+                        <label for="item-unit" class="block text-xs font-bold text-slate-700 mb-1">単位</label>
+                        <input type="text" id="item-unit" placeholder="個, 本, パック, g" value="個" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                    </div>
+                </div>
+
+                <!-- 備考・メモ -->
+                <div>
+                    <label for="item-note" class="block text-xs font-bold text-slate-700 mb-1">メモ (任意)</label>
+                    <input type="text" id="item-note" placeholder="開封済み、早めに使用など" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                </div>
+
+                <!-- 送信ボタン -->
+                <div class="pt-2 flex gap-2">
+                    <button type="button" id="cancel-modal-btn" class="flex-1 py-2.5 border border-slate-300 text-slate-600 rounded-lg text-sm font-semibold hover:bg-slate-50 transition">キャンセル</button>
+                    <button type="submit" class="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-semibold transition shadow-md">保存する</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 通知トースト -->
+    <div id="toast" class="fixed bottom-4 right-4 bg-slate-800 text-white px-4 py-3 rounded-xl shadow-lg transform translate-y-20 opacity-0 transition-all duration-300 flex items-center gap-2 z-50 text-sm">
+        <i data-lucide="check-circle" class="w-4 h-4 text-emerald-400" id="toast-icon"></i>
+        <span id="toast-message">メッセージ</span>
+    </div>
+
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
