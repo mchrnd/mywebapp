@@ -1,0 +1,52 @@
+:root {
+    --color-primary: #2563eb;
+    --color-primary-dark: #1d4ed8;
+    --color-bg: #eff6ff;
+    --color-surface: #ffffff;
+    --color-text: #0f172a;
+    --color-muted: #64748b;
+    --color-border: #bfdbfe;
+    --color-danger: #dc2626;
+}
+
+body {
+    font-family: 'Noto Sans JP', sans-serif;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.safe-top {
+    padding-top: env(safe-area-inset-top);
+}
+.scrollbar-none {
+    scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+    display: none;
+}
+
+@media (max-width: 639px) {
+    /* iOSで入力欄フォーカス時に画面が拡大されるのを防ぐ */
+    input, select, textarea {
+        font-size: 16px !important;
+    }
+}
+
+/* 長押しメニューの邪魔になる、iOSのテキスト選択・コールアウトを無効にする */
+.no-callout {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+/* 並び替えモードの長押しドラッグ */
+.drag-row {
+    transition: transform 0.15s;
+    touch-action: pan-y;
+}
+.drag-row.dragging {
+    transition: none;
+    position: relative;
+    z-index: 10;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+    opacity: 0.95;
+}
