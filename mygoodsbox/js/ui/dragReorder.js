@@ -14,28 +14,30 @@ export function attachDragReorder(rows, onDrop) {
         let rects = [];
         let target = index;
 
-        const blockScroll = (e) => e.preventDefault();
-
         function begin() {
+            timer = null;
+            // 長押しの間に画面が描き直されて、行が外れていたら始めない
+            if (!row.isConnected) return;
             dragging = true;
             rects = rows.map((r) => r.getBoundingClientRect());
             row.classList.add('dragging');
             try { row.setPointerCapture(pointerId); } catch { /* 取れなくても動作は続ける */ }
-            // ドラッグ中は、画面のスクロールを止める
-            document.addEventListener('touchmove', blockScroll, { passive: false });
             navigator.vibrate?.(15);
         }
 
         function reset() {
             clearTimeout(timer);
             timer = null;
-            document.removeEventListener('touchmove', blockScroll);
             row.classList.remove('dragging');
             rows.forEach((r) => { r.style.transform = ''; });
             dragging = false;
         }
 
         row.addEventListener('contextmenu', (e) => e.preventDefault());
+
+        // ドラッグ中は画面のスクロールを止める。スマホのブラウザは、触れた時点で登録済みの
+        // （passive でない）リスナーでしかスクロールを止められないため、行ごとに最初から登録しておく
+        row.addEventListener('touchmove', (e) => { if (dragging) e.preventDefault(); }, { passive: false });
 
         row.addEventListener('pointerdown', (e) => {
             if (e.target.closest('button')) return;
@@ -80,5 +82,7 @@ export function attachDragReorder(rows, onDrop) {
             if (moved) onDrop(index, to);
         });
         row.addEventListener('pointercancel', reset);
+        // ドラッグ中に画面が描き直されて行が外れた場合など、ポインターを失ったら何もせずに終える
+        row.addEventListener('lostpointercapture', () => { if (dragging) reset(); });
     });
 }
