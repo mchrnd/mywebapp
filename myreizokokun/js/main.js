@@ -33,6 +33,7 @@ let items = [];
 let currentCategory = 'all';
 let searchQuery = '';
 let currentSort = 'expiry-asc';
+let currentStatus = 'all';
 
 // --- DOM要素 ---
 const itemListEl = document.getElementById('item-list');
@@ -269,7 +270,12 @@ function render() {
         const matchesCategory = currentCategory === 'all' || item.category === currentCategory;
         const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                               (item.note && item.note.toLowerCase().includes(searchQuery.toLowerCase()));
-        return matchesCategory && matchesSearch;
+        const days = getDaysDiff(item.expiry);
+        const matchesStatus = currentStatus === 'all'
+            || (currentStatus === 'expired' && days < 0)
+            || (currentStatus === 'warning' && days >= 0 && days <= 1)
+            || (currentStatus === 'soon' && days >= 2 && days <= 3);
+        return matchesCategory && matchesSearch && matchesStatus;
     });
 
     filtered.sort((a, b) => {
@@ -295,6 +301,8 @@ function render() {
 
         if (searchQuery) {
             emptyMessageEl.textContent = `「${searchQuery}」に一致する食材はありません`;
+        } else if (currentStatus !== 'all') {
+            emptyMessageEl.textContent = `この条件に該当する食材はありません`;
         } else if (currentCategory !== 'all') {
             emptyMessageEl.textContent = `このカテゴリには食材がありません`;
         } else {
@@ -528,6 +536,22 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('open-add-modal-btn').addEventListener('click', () => openModal());
     document.getElementById('empty-add-btn').addEventListener('click', () => openModal());
     document.getElementById('fab-add-btn').addEventListener('click', () => openModal());
+
+    const statusCards = document.querySelectorAll('.status-card');
+    const setStatusFilter = (status) => {
+        currentStatus = (currentStatus === status && status !== 'all') ? 'all' : status;
+        statusCards.forEach(card => card.classList.toggle('active', card.dataset.status === currentStatus));
+        render();
+    };
+    statusCards.forEach(card => {
+        card.addEventListener('click', () => setStatusFilter(card.dataset.status));
+        card.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                setStatusFilter(card.dataset.status);
+            }
+        });
+    });
     document.getElementById('close-modal-btn').addEventListener('click', closeModal);
     document.getElementById('cancel-modal-btn').addEventListener('click', closeModal);
 

@@ -17,6 +17,18 @@ body {
     background: #94a3b8;
 }
 
+.status-card {
+    cursor: pointer;
+    user-select: none;
+    transition: box-shadow 0.15s, transform 0.1s;
+}
+.status-card:active {
+    transform: scale(0.97);
+}
+.status-card.active {
+    box-shadow: 0 0 0 2px var(--ring);
+}
+
 .safe-top {
     padding-top: env(safe-area-inset-top);
 }
