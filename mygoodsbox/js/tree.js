@@ -92,10 +92,39 @@ export function wouldCreateCycle(folders, folderId, newParentId) {
 }
 
 // 階層をたどってホームまで届くフォルダーと、そこに入っているチップだけを返す（孤児は除く）
+// ホームまで届くフォルダーのID。一度の走査で、たどった経路の結果を覚えて使い回す（フォルダー数にほぼ比例）。
+// 同じ folders 配列（Firestoreの1回の更新）に対しては、結果をキャッシュする
+const reachableCache = new WeakMap();
+function reachableFolderIds(folders) {
+    const cached = reachableCache.get(folders);
+    if (cached) return cached;
+    const byId = indexById(folders);
+    const known = new Map(); // id -> true（ホームまで届く）/ false（届かない）
+    for (const start of folders) {
+        const path = [];
+        const onPath = new Set();
+        let current = start;
+        let result = false;
+        while (true) {
+            if (known.has(current.id)) { result = known.get(current.id); break; }
+            if (onPath.has(current.id)) { result = false; break; } // 循環しているデータ
+            path.push(current.id);
+            onPath.add(current.id);
+            if (current.parentId === null) { result = true; break; }
+            const parent = byId.get(current.parentId);
+            if (!parent) { result = false; break; }
+            current = parent;
+        }
+        for (const id of path) known.set(id, result);
+    }
+    const ids = new Set([...known].filter(([, ok]) => ok).map(([id]) => id));
+    reachableCache.set(folders, ids);
+    return ids;
+}
+
 function reachable(folders, chips) {
-    const ok = folders.filter((f) => getBreadcrumb(folders, f.id).length > 0);
-    const okIds = new Set(ok.map((f) => f.id));
-    return { folders: ok, chips: chips.filter((c) => okIds.has(c.folderId)) };
+    const okIds = reachableFolderIds(folders);
+    return { folders: folders.filter((f) => okIds.has(f.id)), chips: chips.filter((c) => okIds.has(c.folderId)) };
 }
 
 export function allTags(folders, chips) {
@@ -250,4 +279,32 @@ export function splitNewNames(names, existingNames, skipExisting) {
         add: names.filter((n) => !existing.has(n)),
         skipped: names.filter((n) => existing.has(n)),
     };
+}
+
+const sameTags = (a, b) => {
+    const x = a || [];
+    const y = b || [];
+    return x.length === y.length && x.every((t, i) => t === y[i]);
+};
+const sameIcon = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+
+// チップの保存内容。新規は全項目、編集は変わった項目だけ（ほかの端末での個数の増減を上書きしない）
+export function buildChipPatch(original, edited) {
+    if (!original) return { name: edited.name, count: edited.count, tags: edited.tags };
+    const patch = {};
+    if (edited.name !== original.name) patch.name = edited.name;
+    if (edited.count !== original.count) patch.count = edited.count;
+    if (!sameTags(edited.tags, original.tags)) patch.tags = edited.tags;
+    return patch;
+}
+
+// フォルダーの編集内容。変わった項目だけを返す。別の親へ移動したときは、元の並び順を消す（clearOrder）
+export function buildFolderPatch(original, edited) {
+    const patch = {};
+    if (edited.name !== original.name) patch.name = edited.name;
+    if (edited.parentId !== original.parentId) patch.parentId = edited.parentId;
+    if (!sameTags(edited.tags, original.tags)) patch.tags = edited.tags;
+    if (!sameIcon(edited.icon, original.icon)) patch.icon = edited.icon;
+    const clearOrder = 'parentId' in patch && typeof original.order === 'number';
+    return { patch, clearOrder };
 }

@@ -38,14 +38,19 @@ export function createTagInput({ getSuggestions, initial = [] }) {
         }, `+ ${t}`)));
     }
 
-    input.addEventListener('input', () => {
-        // カンマ（半角・全角）で確定。IME変換中は無視する
+    // カンマ（半角・全角）で確定する。日本語入力の変換中は判定せず、変換が終わってから判定する
+    function splitOnComma() {
         if (input.value.includes(',') || input.value.includes('，')) {
             input.value.split(/[,，]/).forEach(commit);
             input.value = '';
         }
         refresh();
+    }
+    input.addEventListener('input', (e) => {
+        if (e.isComposing) { refresh(); return; }
+        splitOnComma();
     });
+    input.addEventListener('compositionend', splitOnComma);
     input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.isComposing) {
             e.preventDefault();

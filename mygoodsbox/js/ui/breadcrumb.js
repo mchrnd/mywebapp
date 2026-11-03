@@ -2,8 +2,10 @@ import { h } from './dom.js';
 import { getBreadcrumb, getSiblings } from '../tree.js';
 
 let listenersReady = false;
+let openListId = null; // 開いている▼メニューの一覧のID（画面の更新後に開き直すため）
 
 function closeAll(except) {
+    openListId = null;
     document.querySelectorAll('[data-bc-toggle][aria-expanded="true"]').forEach((btn) => {
         if (btn === except) return;
         btn.setAttribute('aria-expanded', 'false');
@@ -26,8 +28,9 @@ function setupGlobalListeners() {
     });
 }
 
-function openMenu(btn, list) {
+function openMenu(btn, list, { focus = true } = {}) {
     closeAll(btn);
+    openListId = list.id;
     btn.setAttribute('aria-expanded', 'true');
     list.removeAttribute('hidden');
     // 画面の右端からはみ出さないように寄せる
@@ -35,7 +38,16 @@ function openMenu(btn, list) {
     const rect = list.getBoundingClientRect();
     const overflow = rect.right - (window.innerWidth - 8);
     if (overflow > 0) list.style.left = `-${overflow}px`;
-    list.querySelector('button')?.focus();
+    if (focus) list.querySelector('button')?.focus();
+}
+
+// 画面を描き直したあとに呼ぶ。描き直す前に開いていた▼メニューを、フォーカスを動かさずに開き直す
+export function restoreOpenMenu() {
+    if (!openListId) return;
+    const list = document.getElementById(openListId);
+    const toggle = document.querySelector(`[data-bc-toggle][aria-controls="${openListId}"]`);
+    if (list && toggle) openMenu(toggle, list, { focus: false });
+    else openListId = null;
 }
 
 export function renderBreadcrumb(root, { folders, currentId, onNavigate }) {

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
     normalizeTag, normalizeTags, getChildFolders, getChipsIn, getBreadcrumb, getSiblings,
     pathLabel, collectDescendants, wouldCreateCycle, allTags, filterByTags,
-    chipNameSuggestions, tagSuggestions, chunkIds, parseCount, tagCounts, visibleFilterTags, renameTagUpdates, removeTagUpdates, moveWithinSiblings, moveToIndex, parseChipNames, splitNewNames,
+    chipNameSuggestions, tagSuggestions, chunkIds, parseCount, tagCounts, visibleFilterTags, renameTagUpdates, removeTagUpdates, moveWithinSiblings, moveToIndex, parseChipNames, splitNewNames, buildChipPatch, buildFolderPatch,
 } from '../mygoodsbox/js/tree.js';
 
 const f = (id, name, parentId, tags = []) => ({ id, name, parentId, tags, icon: null, createdAt: 0 });
@@ -254,4 +254,39 @@ test('moveToIndex clamps the target and does nothing when the position is unchan
     assert.deepEqual(moveToIndex([a, b], 'a', 99), [{ id: 'b', order: 0 }, { id: 'a', order: 1 }]);
     assert.deepEqual(moveToIndex([a, b], 'b', -5), [{ id: 'b', order: 0 }, { id: 'a', order: 1 }]);
     assert.deepEqual(moveToIndex([a, b], 'nope', 1), []);
+});
+
+test('buildChipPatch sends every field for a new chip and only changed fields for an edit', () => {
+    assert.deepEqual(buildChipPatch(null, { name: 'A', count: 1, tags: ['t'] }), { name: 'A', count: 1, tags: ['t'] });
+    const original = c('x', 'A', 'F', 5, ['t']);
+    // 名前だけ変えたときは、個数を書き戻さない（ほかの端末での増減を消さない）
+    assert.deepEqual(buildChipPatch(original, { name: 'B', count: 5, tags: ['t'] }), { name: 'B' });
+    assert.deepEqual(buildChipPatch(original, { name: 'A', count: 7, tags: ['t'] }), { count: 7 });
+    assert.deepEqual(buildChipPatch(original, { name: 'A', count: 5, tags: ['u'] }), { tags: ['u'] });
+    assert.deepEqual(buildChipPatch(original, { name: 'A', count: 5, tags: ['t'] }), {});
+    assert.deepEqual(buildChipPatch({ ...original, tags: undefined }, { name: 'A', count: 5, tags: [] }), {});
+});
+
+test('buildFolderPatch sends only changed fields and clears order when the parent changes', () => {
+    const icon = { type: 'preset', value: 'star', color: '#ef4444' };
+    const original = { ...f('x', 'A', 'P1', ['t']), icon, order: 3 };
+    const same = { name: 'A', parentId: 'P1', tags: ['t'], icon: { ...icon } };
+    assert.deepEqual(buildFolderPatch(original, same), { patch: {}, clearOrder: false });
+    assert.deepEqual(buildFolderPatch(original, { ...same, name: 'B' }), { patch: { name: 'B' }, clearOrder: false });
+    // 別の親へ移動したら、元の並び順は意味がないので消す（移動先では後ろに並ぶ）
+    assert.deepEqual(buildFolderPatch(original, { ...same, parentId: 'P2' }), { patch: { parentId: 'P2' }, clearOrder: true });
+    assert.deepEqual(buildFolderPatch({ ...original, order: undefined }, { ...same, parentId: null }), { patch: { parentId: null }, clearOrder: false });
+    assert.deepEqual(buildFolderPatch(original, { ...same, icon: null }), { patch: { icon: null }, clearOrder: false });
+    assert.deepEqual(buildFolderPatch({ ...original, icon: undefined, tags: undefined }, { ...same, icon: null, tags: [] }), { patch: {}, clearOrder: false });
+});
+
+test('tag helpers stay fast with thousands of folders', () => {
+    const many = [f('root', 'root', null)];
+    for (let i = 0; i < 4000; i++) many.push(f(`n${i}`, `n${i}`, i % 2 ? 'root' : `n${i - 1 >= 0 ? i - 1 : 0}`, ['t']));
+    const start = performance.now();
+    tagCounts(many, []);
+    allTags(many, []);
+    filterByTags(many, [], ['t']);
+    const ms = performance.now() - start;
+    assert.ok(ms < 300, `took ${ms.toFixed(0)}ms`);
 });

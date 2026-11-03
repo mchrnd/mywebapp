@@ -1,7 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import {
-    getFirestore, collection, doc, addDoc, updateDoc, onSnapshot, writeBatch, increment, serverTimestamp,
+    getFirestore, collection, doc, addDoc, updateDoc, onSnapshot, writeBatch, increment, serverTimestamp, deleteField,
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { chunkIds } from "./tree.js";
 
@@ -62,8 +62,9 @@ export async function addFolder(uid, { name, parentId, tags, icon }) {
     await addDoc(foldersRef(uid), { name, parentId, tags, icon, createdAt: serverTimestamp() });
 }
 
-export async function updateFolder(uid, id, patch) {
-    await updateDoc(folderDoc(uid, id), patch);
+// clearOrder: 別の親へ移動したときに、元の並び順（order）を消す
+export async function updateFolder(uid, id, patch, { clearOrder = false } = {}) {
+    await updateDoc(folderDoc(uid, id), clearOrder ? { ...patch, order: deleteField() } : patch);
 }
 
 export async function addChip(uid, { name, folderId, count, tags }) {
@@ -78,52 +79,48 @@ export async function changeCount(uid, chipId, delta) {
     await updateDoc(chipDoc(uid, chipId), { count: increment(delta) });
 }
 
-// Firestoreのバッチ上限（500）を超えないよう分割して削除する
+// Firestoreのバッチ上限（500）を超えないよう、items を分けて書き込む。
+// すべてのバッチを先に発行してからまとめて待つ。オフラインでも全件がすぐ端末に登録され、
+// 1つ目の完了を待って残りが止まることはない（write(batch, item) で1件ずつの書き込みを足す）
+async function commitInChunks(items, write) {
+    const commits = chunkIds(items, BATCH_LIMIT).map((group) => {
+        const batch = writeBatch(db);
+        group.forEach((item) => write(batch, item));
+        return batch.commit();
+    });
+    await Promise.all(commits);
+}
+
+// チップを先に、フォルダーは深い階層から消す（途中で失敗しても、親だけ消えて子が残ることを避ける）
 export async function deleteMany(uid, { folderIds, chipIds }) {
     const targets = [
         ...chipIds.map((id) => chipDoc(uid, id)),
-        ...folderIds.map((id) => folderDoc(uid, id)),
+        ...[...folderIds].reverse().map((id) => folderDoc(uid, id)),
     ];
-    for (const group of chunkIds(targets, BATCH_LIMIT)) {
-        const batch = writeBatch(db);
-        group.forEach((ref) => batch.delete(ref));
-        await batch.commit();
-    }
+    await commitInChunks(targets, (batch, ref) => batch.delete(ref));
 }
 
-// タグの名前変更・削除の結果（renameTagUpdates / removeTagUpdates）を、バッチ上限を超えないよう分割して反映する
+// タグの名前変更・削除の結果（renameTagUpdates / removeTagUpdates）を反映する
 export async function applyTagUpdates(uid, { folderUpdates, chipUpdates }) {
     const writes = [
         ...folderUpdates.map((u) => ({ ref: folderDoc(uid, u.id), tags: u.tags })),
         ...chipUpdates.map((u) => ({ ref: chipDoc(uid, u.id), tags: u.tags })),
     ];
-    for (const group of chunkIds(writes, BATCH_LIMIT)) {
-        const batch = writeBatch(db);
-        group.forEach((w) => batch.update(w.ref, { tags: w.tags }));
-        await batch.commit();
-    }
+    await commitInChunks(writes, (batch, w) => batch.update(w.ref, { tags: w.tags }));
 }
 
-// 並び替えの結果（moveWithinSiblings）を order として反映する
+// 並び替えの結果（moveWithinSiblings / moveToIndex）を order として反映する
 export async function applyOrderUpdates(uid, { folderUpdates, chipUpdates }) {
     const writes = [
         ...folderUpdates.map((u) => ({ ref: folderDoc(uid, u.id), order: u.order })),
         ...chipUpdates.map((u) => ({ ref: chipDoc(uid, u.id), order: u.order })),
     ];
-    for (const group of chunkIds(writes, BATCH_LIMIT)) {
-        const batch = writeBatch(db);
-        group.forEach((w) => batch.update(w.ref, { order: w.order }));
-        await batch.commit();
-    }
+    await commitInChunks(writes, (batch, w) => batch.update(w.ref, { order: w.order }));
 }
 
-// チップを複数まとめて追加する。バッチ上限を超えないよう分割して書き込む
+// チップを複数まとめて追加する
 export async function addChips(uid, folderId, items) {
-    for (const group of chunkIds(items, BATCH_LIMIT)) {
-        const batch = writeBatch(db);
-        group.forEach(({ name, count, tags }) => {
-            batch.set(doc(chipsRef(uid)), { name, folderId, count, tags, createdAt: serverTimestamp() });
-        });
-        await batch.commit();
-    }
+    await commitInChunks(items, (batch, { name, count, tags }) => {
+        batch.set(doc(chipsRef(uid)), { name, folderId, count, tags, createdAt: serverTimestamp() });
+    });
 }

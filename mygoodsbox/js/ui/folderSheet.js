@@ -131,12 +131,13 @@ export function openFolderSheet({ folder, prefill = null, parentId, folders, sug
             if (!name) { error.textContent = '名前を入力してください'; return; }
             // オフラインでは書き込みの完了を待てないので、すぐ閉じる（画面はローカルの更新で反映される）。失敗時だけトーストを出す
             saveButton.disabled = true;
-            const pending = Promise.resolve(onSave({
+            const data = {
                 name,
                 parentId: moveSelect ? (moveSelect.value || null) : parentId,
                 tags: tagInput.getTags(),
                 icon: iconValue,
-            }));
+            };
+            const pending = Promise.resolve().then(() => onSave(data));
             close();
             pending.catch((err) => { console.error(err); showToast('保存できませんでした'); });
         },

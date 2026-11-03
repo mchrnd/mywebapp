@@ -41,6 +41,7 @@ export function renderTagFilter(root, { counts, selected, onToggle, panelOpen, o
             type: 'search',
             class: 'w-full border border-border rounded-lg px-3 py-2 bg-surface mt-2',
             placeholder: 'タグを検索',
+            'data-focus-key': 'tag-search',
             value: query,
             // 入力のたびに全体を描き直すとフォーカスが外れるため、一覧だけ更新する
             onInput: (e) => { query = e.target.value; onQuery(query); fill(); },

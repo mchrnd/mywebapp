@@ -61,7 +61,8 @@ export function openBulkChipSheet({ existingNames, suggestTags, onSave }) {
             if (count === null) { error.textContent = '初期個数は0以上の整数で入力してください'; return; }
             const tags = tagInput.getTags();
             saveButton.disabled = true;
-            const pending = Promise.resolve(onSave(add.map((name) => ({ name, count, tags: [...tags] }))));
+            const items = add.map((name) => ({ name, count, tags: [...tags] }));
+            const pending = Promise.resolve().then(() => onSave(items));
             close();
             pending.catch((err) => { console.error(err); showToast('保存できませんでした'); });
         },

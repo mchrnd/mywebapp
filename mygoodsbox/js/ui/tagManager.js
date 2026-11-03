@@ -8,12 +8,14 @@ import { normalizeTag } from '../tree.js';
 export function openTagManager({ getCounts, onRename, onDelete }) {
     const list = h('div', { class: 'grid gap-2 mt-3' });
     let editing = null;
+    let draft = null; // 名前を変更中に入力している文字（画面が更新されても消さない）
 
     // オフラインでは書き込みの完了を待てないので、待たずに閉じる。失敗時だけトーストを出す。
     // 画面の件数は、ローカルのスナップショット更新のあと main.js が refresh() を呼んで更新する
     function run(action) {
-        Promise.resolve(action()).catch((err) => { console.error(err); showToast('保存できませんでした'); });
+        Promise.resolve().then(action).catch((err) => { console.error(err); showToast('保存できませんでした'); });
         editing = null;
+        draft = null;
         refresh();
     }
 
@@ -25,20 +27,25 @@ export function openTagManager({ getCounts, onRename, onDelete }) {
                 value: tag,
                 'aria-label': `${tag}の新しい名前`,
             });
+            if (draft !== null) input.value = draft;
+            input.addEventListener('input', () => { draft = input.value; });
             const apply = async () => {
                 const to = normalizeTag(input.value);
                 if (!to) { showToast('タグ名を入力してください'); return; }
-                if (to === tag) { editing = null; refresh(); return; }
+                if (to === tag) { editing = null; draft = null; refresh(); return; }
                 const merge = getCounts().find((x) => x.tag === to);
                 if (merge && !(await confirmDialog(`『${tag}』を『${to}』に統合します。\n${count}件のタグが『${to}』に変わります。`, '統合する'))) return;
                 run(() => onRename(tag, to));
             };
             input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.isComposing) apply(); });
-            setTimeout(() => input.focus(), 0);
+            setTimeout(() => {
+                input.focus();
+                input.setSelectionRange(input.value.length, input.value.length);
+            }, 0);
             return h('div', { class: 'flex items-center gap-2' },
                 input,
                 h('button', { type: 'button', class: 'px-3 py-2 rounded-lg bg-primary text-white', onClick: apply }, '変更'),
-                h('button', { type: 'button', class: 'px-3 py-2 rounded-lg border border-border', onClick: () => { editing = null; refresh(); } }, '取消'));
+                h('button', { type: 'button', class: 'px-3 py-2 rounded-lg border border-border', onClick: () => { editing = null; draft = null; refresh(); } }, '取消'));
         }
         return h('div', { class: 'flex items-center gap-2 bg-surface border border-border rounded-xl pl-3' },
             h('div', { class: 'flex-1 min-w-0 truncate' }, tag),
@@ -47,7 +54,7 @@ export function openTagManager({ getCounts, onRename, onDelete }) {
                 type: 'button',
                 class: 'w-11 h-11 flex items-center justify-center text-muted',
                 'aria-label': `${tag}の名前を変更`,
-                onClick: () => { editing = tag; refresh(); },
+                onClick: () => { editing = tag; draft = null; refresh(); },
             }, icon('pencil', 'w-4 h-4')),
             h('button', {
                 type: 'button',
@@ -61,6 +68,11 @@ export function openTagManager({ getCounts, onRename, onDelete }) {
 
     function refresh() {
         const counts = getCounts();
+        // 編集中のタグが、ほかの端末での変更などで消えたときは、編集をやめる
+        if (editing !== null && !counts.some((x) => x.tag === editing)) {
+            editing = null;
+            draft = null;
+        }
         list.replaceChildren(...(counts.length
             ? counts.map(row)
             : [h('p', { class: 'text-center text-muted py-6' }, 'タグはまだありません')]));

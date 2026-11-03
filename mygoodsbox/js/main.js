@@ -5,13 +5,15 @@ import {
 import {
     getChildFolders, getChipsIn, getBreadcrumb, collectDescendants, tagSuggestions, chipNameSuggestions,
     tagCounts, filterByTags, pathLabel, renameTagUpdates, removeTagUpdates, moveWithinSiblings, moveToIndex,
+    buildChipPatch, buildFolderPatch,
 } from './tree.js';
 import { openFolderSheet } from './ui/folderSheet.js';
 import { openChipSheet } from './ui/chipSheet.js';
 import { confirmDialog } from './ui/confirm.js';
 import { h, icon } from './ui/dom.js';
 import { showToast } from './ui/toast.js';
-import { renderBreadcrumb } from './ui/breadcrumb.js';
+import { renderBreadcrumb, restoreOpenMenu } from './ui/breadcrumb.js';
+import { closeAllSheets } from './ui/sheet.js';
 import { renderFolderList } from './ui/folderList.js';
 import { renderChipList } from './ui/chipList.js';
 import { renderTagFilter } from './ui/tagFilter.js';
@@ -34,7 +36,14 @@ const state = {
     tagPanelOpen: false,
     tagQuery: '',
     reorderIn: null, // 並び替えモード中は { id: 開いているフォルダーのID（ホームは null） }
+    loadError: false,
 };
+
+// ログイン中のユーザーのID。ログアウト後に呼ばれたときは例外にして、保存処理の失敗として扱う
+function uid() {
+    if (!state.user) throw new Error('ログインしていません');
+    return state.user.uid;
+}
 
 const suggestTags = (query, chosen) => tagSuggestions(state.folders, state.chips, query, chosen);
 
@@ -45,7 +54,7 @@ function addFolderHere() {
         parentId,
         folders: state.folders,
         suggestTags,
-        onSave: (data) => addFolder(state.user.uid, data),
+        onSave: (data) => addFolder(uid(), data),
     });
 }
 
@@ -56,7 +65,7 @@ function duplicateFolder(folder) {
         parentId: folder.parentId,
         folders: state.folders,
         suggestTags,
-        onSave: (data) => addFolder(state.user.uid, data),
+        onSave: (data) => addFolder(uid(), data),
     });
 }
 
@@ -68,7 +77,12 @@ function editFolder(id) {
         parentId: folder.parentId,
         folders: state.folders,
         suggestTags,
-        onSave: (data) => updateFolder(state.user.uid, id, data),
+        // 変わった項目だけを保存する。別の親へ移動したときは、元の並び順を消す
+        onSave: (data) => {
+            const { patch, clearOrder } = buildFolderPatch(folder, data);
+            if (Object.keys(patch).length === 0) return undefined;
+            return updateFolder(uid(), id, patch, { clearOrder });
+        },
         onDelete: () => deleteFolder(folder),
         onDuplicate: () => duplicateFolder(folder),
     });
@@ -81,7 +95,7 @@ async function deleteFolder(folder) {
         `『${folder.name}』を削除します。\n中のフォルダー${subFolders}件・チップ${targets.chipIds.length}件も削除されます。`);
     if (!ok) return false;
     // オフラインでは完了を待てないので、発行した時点で成功扱いにし、失敗時だけトーストを出す
-    deleteMany(state.user.uid, targets).catch((err) => { console.error(err); showToast('削除できませんでした'); });
+    deleteMany(uid(), targets).catch((err) => { console.error(err); showToast('削除できませんでした'); });
     return true;
 }
 
@@ -94,7 +108,7 @@ function addChipHere() {
         chip: null,
         suggestName,
         suggestTags,
-        onSave: (data) => addChip(state.user.uid, { ...data, folderId }),
+        onSave: (data) => addChip(uid(), { ...data, folderId }),
     });
 }
 
@@ -104,7 +118,7 @@ function duplicateChip(chip) {
         prefill: chip,
         suggestName,
         suggestTags,
-        onSave: (data) => addChip(state.user.uid, { ...data, folderId: chip.folderId }),
+        onSave: (data) => addChip(uid(), { ...data, folderId: chip.folderId }),
     });
 }
 
@@ -114,7 +128,7 @@ function addChipsHere() {
     openBulkChipSheet({
         existingNames: getChipsIn(state.chips, folderId).map((c) => c.name),
         suggestTags,
-        onSave: (items) => addChips(state.user.uid, folderId, items),
+        onSave: (items) => addChips(uid(), folderId, items),
     });
 }
 
@@ -125,11 +139,16 @@ function editChip(id) {
         chip,
         suggestName,
         suggestTags,
-        onSave: (data) => updateChip(state.user.uid, id, data),
+        // 変わった項目だけを保存する（名前だけ変えたときに、ほかの端末での個数の増減を消さない）
+        onSave: (data) => {
+            const patch = buildChipPatch(chip, data);
+            if (Object.keys(patch).length === 0) return undefined;
+            return updateChip(uid(), id, patch);
+        },
         onDuplicate: () => duplicateChip(chip),
         onDelete: async () => {
             if (!(await confirmDialog(`『${chip.name}』を削除します。`))) return false;
-            deleteMany(state.user.uid, { folderIds: [], chipIds: [id] })
+            deleteMany(uid(), { folderIds: [], chipIds: [id] })
                 .catch((err) => { console.error(err); showToast('削除できませんでした'); });
             return true;
         },
@@ -145,7 +164,7 @@ function saveOrder(kind, computeUpdates) {
         : getChipsIn(state.chips, state.currentId);
     const updates = computeUpdates(siblings);
     if (updates.length === 0) return;
-    applyOrderUpdates(state.user.uid, {
+    applyOrderUpdates(uid(), {
         folderUpdates: kind === 'folder' ? updates : [],
         chipUpdates: kind === 'chip' ? updates : [],
     }).catch((err) => { console.error(err); showToast('保存できませんでした'); });
@@ -157,8 +176,8 @@ const moveItemTo = (kind, id, toIndex) => saveOrder(kind, (siblings) => moveToIn
 function manageTags() {
     tagManager = openTagManager({
         getCounts: () => tagCounts(state.folders, state.chips),
-        onRename: (from, to) => applyTagUpdates(state.user.uid, renameTagUpdates(state.folders, state.chips, from, to)),
-        onDelete: (tag) => applyTagUpdates(state.user.uid, removeTagUpdates(state.folders, state.chips, tag)),
+        onRename: (from, to) => applyTagUpdates(uid(), renameTagUpdates(state.folders, state.chips, from, to)),
+        onDelete: (tag) => applyTagUpdates(uid(), removeTagUpdates(state.folders, state.chips, tag)),
     });
 }
 
@@ -186,10 +205,18 @@ function fabView() {
 }
 
 function startSubscription() {
-    state.unsubscribe = subscribe(state.user.uid, {
+    state.unsubscribe = subscribe(uid(), {
         onFolders: (list) => { state.folders = list; state.loaded.folders = true; render(); },
         onChips: (list) => { state.chips = list; state.loaded.chips = true; render(); },
-        onError: (err) => { console.error(err); showToast('読み込みに失敗しました'); },
+        onError: (err) => {
+            console.error(err);
+            showToast('読み込みに失敗しました');
+            // 最初の読み込みで失敗したときは、「読み込み中…」のままにせず、エラーを表示する
+            if (!state.loaded.folders || !state.loaded.chips) {
+                state.loadError = true;
+                render();
+            }
+        },
     });
 }
 
@@ -204,6 +231,7 @@ function stopSubscription() {
     state.tagPanelOpen = false;
     state.tagQuery = '';
     state.reorderIn = null;
+    state.loadError = false;
 }
 
 function loginView() {
@@ -381,7 +409,7 @@ function browserView() {
 // 画面の数字は、Firestoreのローカルスナップショットが先に更新し、失敗時は自動で元に戻る
 async function bump(chipId, delta) {
     try {
-        await changeCount(state.user.uid, chipId, delta);
+        await changeCount(uid(), chipId, delta);
     } catch (err) {
         console.error(err);
         showToast('保存できませんでした');
@@ -391,11 +419,33 @@ async function bump(chipId, delta) {
 function render() {
     if (!state.user) {
         app.replaceChildren(loginView());
+    } else if (state.loadError && (!state.loaded.folders || !state.loaded.chips)) {
+        app.replaceChildren(headerView(), h('div', { class: 'text-center py-12 grid gap-3 justify-items-center' },
+            h('p', { class: 'text-danger' }, 'データを読み込めませんでした。通信状態を確認してください。'),
+            h('button', {
+                type: 'button',
+                class: 'px-4 py-2 rounded-lg bg-primary text-white',
+                onClick: () => location.reload(),
+            }, '再読み込み')));
     } else if (!state.loaded.folders || !state.loaded.chips) {
         app.replaceChildren(headerView(), h('p', { class: 'text-center text-muted py-12' }, '読み込み中…'));
     } else {
+        // 描き直してもフォーカス（タグの検索欄など）が外れないよう、前後で付け直す
+        const active = document.activeElement;
+        const focusKey = active && active.dataset ? active.dataset.focusKey : undefined;
+        const selection = focusKey && typeof active.selectionStart === 'number'
+            ? [active.selectionStart, active.selectionEnd]
+            : null;
         app.replaceChildren(headerView(), browserView(), ...(state.selectedTags.length > 0 || state.reorderIn ? [] : [fabView()]));
         if (tagManager && tagManager.isOpen()) tagManager.refresh();
+        if (focusKey) {
+            const el = app.querySelector(`[data-focus-key="${focusKey}"]`);
+            if (el) {
+                el.focus();
+                if (selection) el.setSelectionRange(selection[0], selection[1]);
+            }
+        }
+        restoreOpenMenu();
     }
     window.lucide?.createIcons();
 }
@@ -415,6 +465,8 @@ document.addEventListener('click', (e) => {
 
 initFirebase();
 watchAuth((user) => {
+    // ログアウトや別のアカウントへの切り替えでは、前のユーザーのシートを閉じる
+    closeAllSheets();
     stopSubscription();
     state.user = user;
     state.menuOpen = false;

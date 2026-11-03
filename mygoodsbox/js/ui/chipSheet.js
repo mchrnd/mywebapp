@@ -50,7 +50,8 @@ export function openChipSheet({ chip, prefill = null, suggestName, suggestTags, 
             if (count === null) { error.textContent = '個数は0以上の整数で入力してください'; return; }
             // オフラインでは書き込みの完了を待てないので、すぐ閉じる。失敗時だけトーストを出す
             saveButton.disabled = true;
-            const pending = Promise.resolve(onSave({ name, count, tags: tagInput.getTags() }));
+            const data = { name, count, tags: tagInput.getTags() };
+            const pending = Promise.resolve().then(() => onSave(data));
             close();
             pending.catch((err) => { console.error(err); showToast('保存できませんでした'); });
         },
