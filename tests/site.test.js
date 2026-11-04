@@ -38,6 +38,16 @@ test('style.css uses the same cache number as main.js', () => {
     assert.match(html, new RegExp(`css/style\\.css\\?v=${mainVersion}"`));
 });
 
+// 画像の切り取りに使う Cropper.js は、画像を選んだときだけ読み込む。ここでも版を固定し、SRIを付ける
+test('cropper.js is loaded lazily from a pinned version with integrity hashes', () => {
+    const text = readFileSync(new URL('js/ui/imageCropper.js', ROOT), 'utf8');
+    const urls = [...text.matchAll(/https:\/\/[^'"`\s]+cropperjs[^'"`\s]+/g)].map((m) => m[0]);
+    assert.equal(urls.length, 2, 'loads one script and one stylesheet');
+    for (const url of urls) assert.match(url, /cropperjs@1\.\d+\.\d+\/dist\/cropper\.min\.(js|css)$/, `${url} must pin a 1.x version`);
+    assert.equal([...text.matchAll(/'sha384-[A-Za-z0-9+/=]{64}'/g)].length, 2, 'both files need SRI');
+    assert.doesNotMatch(html, /cropperjs/, 'index.html must not load cropper.js up front');
+});
+
 // 外部のスクリプトは、バージョンを固定し、改ざん検知（SRI）を付ける
 test('lucide is pinned to an exact version with an integrity hash', () => {
     for (const file of ['../mygoodsbox/index.html', '../index.html']) {

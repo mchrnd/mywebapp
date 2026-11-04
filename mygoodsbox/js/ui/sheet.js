@@ -9,7 +9,8 @@ export function closeAllSheets() {
 
 // 下から出るシート（モバイル）／中央のダイアログ（PC）。document.body に付けるので、
 // 本体の再描画で消えない。戻り値は閉じる関数
-export function openSheet(content) {
+// onClose: 閉じたときに呼ぶ（外側のタップ、ログアウト時の closeAllSheets も含む）
+export function openSheet(content, { onClose } = {}) {
     const backdrop = h('div', {
         class: 'fixed inset-0 z-40 bg-black/40 flex items-end sm:items-center justify-center',
         onClick: (e) => { if (e.target === backdrop) close(); },
@@ -19,8 +20,10 @@ export function openSheet(content) {
         'aria-modal': 'true',
     }, content));
     function close() {
+        if (!openSheets.has(close)) return; // 2回目以降は何もしない
         backdrop.remove();
         openSheets.delete(close);
+        onClose?.();
     }
     openSheets.add(close);
     document.body.append(backdrop);

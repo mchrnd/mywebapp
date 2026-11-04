@@ -25,7 +25,8 @@ const COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
 // icon: null | {type: 'image'|'emoji'|'preset', value: string, color?: string}
 export function renderIcon(ic, cls = 'w-7 h-7 text-primary shrink-0') {
     if (ic && ic.type === 'image' && typeof ic.value === 'string' && ic.value.startsWith('data:image/')) {
-        return h('img', { src: ic.value, alt: '', class: 'w-8 h-8 rounded object-cover shrink-0' });
+        // 縦長・横長の画像も切らずに全体を入れる（余白は背景の色）
+        return h('img', { src: ic.value, alt: '', class: 'w-8 h-8 rounded object-contain shrink-0' });
     }
     if (ic && ic.type === 'emoji' && ic.value) {
         return h('span', { class: 'w-8 h-8 flex items-center justify-center text-2xl shrink-0' }, ic.value);
@@ -44,7 +45,7 @@ export function renderIcon(ic, cls = 'w-7 h-7 text-primary shrink-0') {
 // 升目の表示で、四角の枠いっぱいに出すチップのアイコン。アイコンがないときは、名前の最初の1文字を出す
 export function renderTileIcon(ic, name) {
     if (ic && ic.type === 'image' && typeof ic.value === 'string' && ic.value.startsWith('data:image/')) {
-        return h('img', { src: ic.value, alt: '', class: 'w-full h-full object-cover' });
+        return h('img', { src: ic.value, alt: '', class: 'w-full h-full object-contain' });
     }
     if (ic && ic.type === 'emoji' && ic.value) {
         return h('span', { class: 'text-5xl leading-none' }, ic.value);

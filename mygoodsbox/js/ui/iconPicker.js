@@ -1,6 +1,6 @@
 import { h } from './dom.js';
 import { renderIcon, PRESET_ICONS, ICON_COLORS, DEFAULT_ICON_COLOR } from './icons.js';
-import { resizeToDataUrl } from '../image.js';
+import { cropImage } from './imageCropper.js';
 
 const MODES = [['none', 'なし'], ['image', '画像'], ['emoji', '絵文字'], ['preset', 'プリセット']];
 
@@ -45,11 +45,15 @@ export function createIconPicker({ initial = null, imageMaxSide = 128, onError =
                 type: 'file',
                 accept: 'image/*',
                 class: 'text-sm',
+                // 選んだ画像は、切り取り画面を挟んでから使う。キャンセルしたらアイコンは変えない
                 onChange: async (e) => {
-                    const file = e.target.files[0];
+                    const input = e.target;
+                    const file = input.files[0];
+                    input.value = ''; // 同じ画像をもう一度選び直せるようにする
                     if (!file) return;
                     try {
-                        iconValue = { type: 'image', value: await resizeToDataUrl(file, { maxSide: imageMaxSide }) };
+                        const value = await cropImage(file, { maxSide: imageMaxSide });
+                        if (value) iconValue = { type: 'image', value };
                         onError('');
                     } catch (err) {
                         onError(err.message); // アイコンは変更しない
