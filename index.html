@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#2563eb">
     <title>マイアプリ</title>
+    <!-- サイト全体を1つのアプリとしてホーム画面に追加できるようにする（PWA） -->
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -60,6 +64,37 @@
             </div>
         </a>
     </main>
-    <script>lucide.createIcons();</script>
+    <!-- アプリとして追加できる状態のときだけ出す -->
+    <div id="install" class="max-w-3xl mx-auto px-4 pb-6" hidden>
+        <button type="button" id="install-btn" class="w-full flex items-center justify-center gap-2 border border-primary text-primary bg-surface rounded-xl px-4 py-3 font-medium active:scale-[0.98] transition">
+            <i data-lucide="download" class="w-5 h-5"></i>
+            アプリとして追加
+        </button>
+    </div>
+    <script>
+        lucide.createIcons();
+
+        // 電波がないときに案内の画面を出すための Service Worker（sw.js）
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js').catch((err) => console.warn('Service Worker を登録できません', err));
+        }
+
+        // Chrome が「追加できる」と知らせてきたら、ボタンを出す。押すと追加の確認が出る
+        let installPrompt = null;
+        const installBox = document.getElementById('install');
+        window.addEventListener('beforeinstallprompt', (event) => {
+            event.preventDefault();
+            installPrompt = event;
+            installBox.hidden = false;
+        });
+        document.getElementById('install-btn').addEventListener('click', async () => {
+            if (!installPrompt) return;
+            installPrompt.prompt();
+            await installPrompt.userChoice;
+            installPrompt = null;
+            installBox.hidden = true;
+        });
+        window.addEventListener('appinstalled', () => { installBox.hidden = true; });
+    </script>
 </body>
 </html>

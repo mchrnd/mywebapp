@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#2563eb">
     <title>グッズ管理</title>
+    <!-- サイト全体（マイアプリ）を1つのアプリとして追加できるようにする設定 -->
+    <link rel="manifest" href="../manifest.webmanifest">
+    <link rel="icon" type="image/png" sizes="32x32" href="../icons/favicon-32.png">
+    <link rel="apple-touch-icon" href="../icons/apple-touch-icon.png">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -30,35 +34,35 @@
     <script src="https://unpkg.com/lucide@1.67.0/dist/umd/lucide.min.js" integrity="sha384-xrRF3kGz5GMZeUudxpTxrrjy0NRy/+U3dHY72SdMEgy9OsrO9x8mCw6DCD8m+jjS" crossorigin="anonymous"></script>
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css?v=16">
+    <link rel="stylesheet" href="css/style.css?v=17">
     <!-- 更新の公開後に新旧のファイルが混ざらないよう、すべてのモジュールに main.js と同じキャッシュ番号を付ける。
          番号を上げるときは、このファイルの ?v= をすべて同じ値にそろえる（tests/site.test.js で確認） -->
     <script type="importmap">
     {
         "imports": {
-            "./js/firebase.js": "./js/firebase.js?v=16",
-            "./js/image.js": "./js/image.js?v=16",
-            "./js/tree.js": "./js/tree.js?v=16",
-            "./js/ui/breadcrumb.js": "./js/ui/breadcrumb.js?v=16",
-            "./js/ui/bulkChipSheet.js": "./js/ui/bulkChipSheet.js?v=16",
-            "./js/ui/chipList.js": "./js/ui/chipList.js?v=16",
-            "./js/ui/chipSheet.js": "./js/ui/chipSheet.js?v=16",
-            "./js/ui/chipViewSwitch.js": "./js/ui/chipViewSwitch.js?v=16",
-            "./js/ui/confirm.js": "./js/ui/confirm.js?v=16",
-            "./js/ui/dom.js": "./js/ui/dom.js?v=16",
-            "./js/ui/dragReorder.js": "./js/ui/dragReorder.js?v=16",
-            "./js/ui/folderList.js": "./js/ui/folderList.js?v=16",
-            "./js/ui/folderSheet.js": "./js/ui/folderSheet.js?v=16",
-            "./js/ui/help.js": "./js/ui/help.js?v=16",
-            "./js/ui/iconPicker.js": "./js/ui/iconPicker.js?v=16",
-            "./js/ui/icons.js": "./js/ui/icons.js?v=16",
-            "./js/ui/imageCropper.js": "./js/ui/imageCropper.js?v=16",
-            "./js/ui/reorderButtons.js": "./js/ui/reorderButtons.js?v=16",
-            "./js/ui/sheet.js": "./js/ui/sheet.js?v=16",
-            "./js/ui/tagFilter.js": "./js/ui/tagFilter.js?v=16",
-            "./js/ui/tagInput.js": "./js/ui/tagInput.js?v=16",
-            "./js/ui/tagManager.js": "./js/ui/tagManager.js?v=16",
-            "./js/ui/toast.js": "./js/ui/toast.js?v=16"
+            "./js/firebase.js": "./js/firebase.js?v=17",
+            "./js/image.js": "./js/image.js?v=17",
+            "./js/tree.js": "./js/tree.js?v=17",
+            "./js/ui/breadcrumb.js": "./js/ui/breadcrumb.js?v=17",
+            "./js/ui/bulkChipSheet.js": "./js/ui/bulkChipSheet.js?v=17",
+            "./js/ui/chipList.js": "./js/ui/chipList.js?v=17",
+            "./js/ui/chipSheet.js": "./js/ui/chipSheet.js?v=17",
+            "./js/ui/chipViewSwitch.js": "./js/ui/chipViewSwitch.js?v=17",
+            "./js/ui/confirm.js": "./js/ui/confirm.js?v=17",
+            "./js/ui/dom.js": "./js/ui/dom.js?v=17",
+            "./js/ui/dragReorder.js": "./js/ui/dragReorder.js?v=17",
+            "./js/ui/folderList.js": "./js/ui/folderList.js?v=17",
+            "./js/ui/folderSheet.js": "./js/ui/folderSheet.js?v=17",
+            "./js/ui/help.js": "./js/ui/help.js?v=17",
+            "./js/ui/iconPicker.js": "./js/ui/iconPicker.js?v=17",
+            "./js/ui/icons.js": "./js/ui/icons.js?v=17",
+            "./js/ui/imageCropper.js": "./js/ui/imageCropper.js?v=17",
+            "./js/ui/reorderButtons.js": "./js/ui/reorderButtons.js?v=17",
+            "./js/ui/sheet.js": "./js/ui/sheet.js?v=17",
+            "./js/ui/tagFilter.js": "./js/ui/tagFilter.js?v=17",
+            "./js/ui/tagInput.js": "./js/ui/tagInput.js?v=17",
+            "./js/ui/tagManager.js": "./js/ui/tagManager.js?v=17",
+            "./js/ui/toast.js": "./js/ui/toast.js?v=17"
         }
     }
     </script>
@@ -66,6 +70,12 @@
 <body class="bg-bg text-text min-h-screen antialiased">
     <div id="app"></div>
     <div id="toast" class="fixed left-1/2 -translate-x-1/2 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-50 pointer-events-none"></div>
-    <script type="module" src="js/main.js?v=16"></script>
+    <script type="module" src="js/main.js?v=17"></script>
+    <script>
+        // 電波がないときに案内の画面を出すための Service Worker（サイトの一番上の sw.js。範囲はサイト全体）
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('../sw.js').catch((err) => console.warn('Service Worker を登録できません', err));
+        }
+    </script>
 </body>
 </html>

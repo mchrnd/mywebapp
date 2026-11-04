@@ -288,6 +288,11 @@ function headerView() {
                 class: 'w-full text-left px-2 py-2 rounded hover:bg-bg',
                 onClick: () => { state.menuOpen = false; render(); manageTags(); },
             }, 'タグの管理'),
+            // アプリとして開いているときはアドレスバーがないので、トップページ（アプリの入口）への道を用意する
+            h('a', {
+                href: '../',
+                class: 'block w-full text-left px-2 py-2 rounded hover:bg-bg',
+            }, 'トップページへ'),
             h('button', {
                 type: 'button',
                 class: 'w-full text-left px-2 py-2 rounded hover:bg-bg',
