@@ -4,7 +4,7 @@ import {
     normalizeTag, normalizeTags, getChildFolders, getChipsIn, getBreadcrumb, getSiblings,
     pathLabel, collectDescendants, wouldCreateCycle, allTags, filterByTags,
     chipNameSuggestions, tagSuggestions, chunkIds, parseCount, tagCounts, visibleFilterTags, renameTagUpdates, removeTagUpdates, moveWithinSiblings, moveToIndex, parseChipNames, splitNewNames, buildChipPatch, buildFolderPatch,
-    initialOf, parseChipView, CHIP_VIEWS,
+    initialOf, parseChipView, CHIP_VIEWS, backStep,
 } from '../mygoodsbox/js/tree.js';
 
 const f = (id, name, parentId, tags = []) => ({ id, name, parentId, tags, icon: null, createdAt: 0 });
@@ -309,6 +309,20 @@ test('parseChipView accepts known views and falls back to the list', () => {
     assert.equal(parseChipView('list'), 'list');
     assert.equal(parseChipView('tiles'), 'list');
     assert.equal(parseChipView(null), 'list');
+});
+
+test('backStep exits reorder mode first, then climbs one folder, and stops at home', () => {
+    const folders = [f('A', 'A', null), f('B', 'B', 'A'), f('C', 'C', 'B')];
+    // 並び替えモードなら、まず並び替えを終える（フォルダーは移らない）
+    assert.deepEqual(backStep(folders, { currentId: 'C', reordering: true }), { reordering: false, currentId: 'C' });
+    assert.deepEqual(backStep(folders, { currentId: null, reordering: true }), { reordering: false, currentId: null });
+    // フォルダーの中なら、1つ上の階層へ（来た道ではなく、いつも親）
+    assert.deepEqual(backStep(folders, { currentId: 'C', reordering: false }), { reordering: false, currentId: 'B' });
+    assert.deepEqual(backStep(folders, { currentId: 'A', reordering: false }), { reordering: false, currentId: null });
+    // 消えたフォルダーにいたときは、ホームへ
+    assert.deepEqual(backStep(folders, { currentId: 'gone', reordering: false }), { reordering: false, currentId: null });
+    // ホームで何もないときは、アプリの中では戻れない（ブラウザの戻るに任せる）
+    assert.equal(backStep(folders, { currentId: null, reordering: false }), null);
 });
 
 test('tag helpers stay fast with thousands of folders', () => {

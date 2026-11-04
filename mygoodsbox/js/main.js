@@ -5,7 +5,7 @@ import {
 import {
     getChildFolders, getChipsIn, getBreadcrumb, collectDescendants, tagSuggestions, chipNameSuggestions,
     tagCounts, filterByTags, pathLabel, renameTagUpdates, removeTagUpdates, moveWithinSiblings, moveToIndex,
-    buildChipPatch, buildFolderPatch, parseChipView,
+    buildChipPatch, buildFolderPatch, parseChipView, backStep,
 } from './tree.js';
 import { chipViewSwitch } from './ui/chipViewSwitch.js';
 import { openFolderSheet } from './ui/folderSheet.js';
@@ -489,7 +489,40 @@ function render() {
         restoreOpenMenu();
     }
     window.lucide?.createIcons();
+    syncBackGuard();
 }
+
+// スマホの「戻る」：並び替えモードを終える → 1つ上の階層へ → ホームからはいつもどおり前のページ（トップページ）へ。
+// アプリの中で戻れる先があるあいだだけ、ブラウザの履歴に目印（BACK_GUARD）を1つ置く。
+// 戻るでその目印が消えたら（popstate）、backStep で1つ戻し、まだ戻れる先があれば目印を置き直す
+const BACK_GUARD = 'mygoodsboxBack';
+let skipNextPop = false; // 目印を自分で消したとき（history.back）の popstate は無視する
+
+const canGoBackInApp = () => Boolean(state.user)
+    && backStep(state.folders, { currentId: state.currentId, reordering: state.reorderIn !== null }) !== null;
+
+function syncBackGuard() {
+    const armed = history.state && history.state[BACK_GUARD] === true;
+    if (canGoBackInApp() && !armed) {
+        history.pushState({ [BACK_GUARD]: true }, '');
+    } else if (!canGoBackInApp() && armed) {
+        // ホームのボタンなどで戻れる先がなくなったら、残った目印を消す（次の戻るでトップページへ抜けるように）
+        skipNextPop = true;
+        history.back();
+    }
+}
+
+window.addEventListener('popstate', () => {
+    if (skipNextPop) {
+        skipNextPop = false;
+        return;
+    }
+    const next = backStep(state.folders, { currentId: state.currentId, reordering: state.reorderIn !== null });
+    if (!next) return;
+    state.reorderIn = null; // backStep は、どの場合も並び替えモードを終える
+    state.currentId = next.currentId;
+    render(); // 描いたあと syncBackGuard が、まだ戻れる先があれば目印を置き直す
+});
 
 // 外側のタップでメニューを閉じるときは、そのタップ自体は無効にする（チップの＋1や▼の誤作動を防ぐ）
 document.addEventListener('click', (e) => {

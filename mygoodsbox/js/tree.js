@@ -312,6 +312,15 @@ export function initialOf(name) {
     return first ? first.segment.toUpperCase() : '?';
 }
 
+// スマホの「戻る」で1つ戻した後の状態。並び替えモードなら並び替えを終え、フォルダーの中なら1つ上の階層へ
+// （来た道ではなく、いつも親）。ホームで何もないときは null（アプリの中では戻れない）
+export function backStep(folders, { currentId, reordering }) {
+    if (reordering) return { reordering: false, currentId };
+    if (currentId === null) return null;
+    const folder = folders.find((x) => x.id === currentId);
+    return { reordering: false, currentId: folder ? folder.parentId : null };
+}
+
 // チップの並べ方：1列・2段組・升目。知らない値（古い保存値など）は1列にする
 export const CHIP_VIEWS = ['list', 'columns', 'grid'];
 export function parseChipView(value) {
