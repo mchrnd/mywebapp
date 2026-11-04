@@ -357,11 +357,13 @@ function browserView() {
     const goTo = (id) => { state.selectedTags = []; state.currentId = id; render(); };
     const folderRoot = h('div', { class: 'grid gap-2' });
     const chipRoot = h('div', { class: 'grid gap-2 mt-2' });
-    // チップが表示されているときだけ、操作のしかたの案内と、並べ方の切り替えを出す
-    const chipHint = (visible) => (visible
+    const viewSwitch = () => chipViewSwitch({ view: state.chipView, onChange: setChipView });
+    // チップが表示されているときだけ、操作のしかたの案内と、並べ方の切り替えを出す。
+    // switchOnPc: false のときは、PC幅（640px以上）では切り替えを出さない（上の「並び替え」の横に出すため）
+    const chipHint = (visible, { switchOnPc = true } = {}) => (visible
         ? h('div', { class: 'flex items-center justify-between gap-2 mt-3' },
             h('p', { class: 'text-xs text-muted' }, 'タップで個数が +1、－ボタンで -1。長押しで編集。'),
-            chipViewSwitch({ view: state.chipView, onChange: setChipView }))
+            switchOnPc ? viewSwitch() : h('div', { class: 'sm:hidden' }, viewSwitch()))
         : null);
 
     if (state.selectedTags.length > 0) {
@@ -414,14 +416,22 @@ function browserView() {
             : null,
     });
     const canReorder = subFolders.length > 1 || chips.length > 1;
-    const reorderToggle = canReorder || reordering
-        ? h('div', { class: 'flex items-center justify-between gap-2 mb-2' },
+    const showReorder = canReorder || reordering;
+    const showSwitch = chips.length > 0 && !reordering;
+    // PC幅では、並べ方の切り替えを「並び替え」の横に並べる。スマホでは、チップの上の案内行に出す。
+    // 「並び替え」が出ないときは、この行はPC幅でだけ出す
+    const reorderToggle = showReorder || showSwitch
+        ? h('div', { class: `${showReorder ? 'flex' : 'hidden sm:flex'} items-center justify-between gap-2 mb-2` },
             h('p', { class: 'text-xs text-muted' }, reordering ? '長押ししてドラッグ、または ↑↓ で並び替え' : ''),
-            h('button', {
-            type: 'button',
-            class: `px-3 py-1.5 rounded-full text-sm border ${reordering ? 'bg-primary text-white border-primary' : 'border-primary text-primary'}`,
-            onClick: () => { state.reorderIn = reordering ? null : { id: state.currentId }; render(); },
-        }, reordering ? '完了' : '並び替え'))
+            h('div', { class: 'flex items-center gap-2' },
+                showSwitch ? h('div', { class: 'hidden sm:block' }, viewSwitch()) : null,
+                showReorder
+                    ? h('button', {
+                        type: 'button',
+                        class: `px-3 py-1.5 rounded-full text-sm border ${reordering ? 'bg-primary text-white border-primary' : 'border-primary text-primary'}`,
+                        onClick: () => { state.reorderIn = reordering ? null : { id: state.currentId }; render(); },
+                    }, reordering ? '完了' : '並び替え')
+                    : null))
         : null;
 
     const empty = subFolders.length === 0 && chips.length === 0
@@ -429,7 +439,7 @@ function browserView() {
             state.currentId === null ? '最初のフォルダーを作りましょう' : 'このフォルダーはまだ空です')
         : null;
 
-    return h('main', { class: 'max-w-3xl mx-auto p-4 pb-28' }, filterRoot, crumbRoot, reorderToggle, folderRoot, chipHint(chips.length > 0 && !reordering), chipRoot, empty);
+    return h('main', { class: 'max-w-3xl mx-auto p-4 pb-28' }, filterRoot, crumbRoot, reorderToggle, folderRoot, chipHint(showSwitch, { switchOnPc: false }), chipRoot, empty);
 }
 
 // 画面の数字は、Firestoreのローカルスナップショットが先に更新し、失敗時は自動で元に戻る
