@@ -30,32 +30,34 @@
     <script src="https://unpkg.com/lucide@1.67.0/dist/umd/lucide.min.js" integrity="sha384-xrRF3kGz5GMZeUudxpTxrrjy0NRy/+U3dHY72SdMEgy9OsrO9x8mCw6DCD8m+jjS" crossorigin="anonymous"></script>
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css?v=13">
+    <link rel="stylesheet" href="css/style.css?v=14">
     <!-- 更新の公開後に新旧のファイルが混ざらないよう、すべてのモジュールに main.js と同じキャッシュ番号を付ける。
          番号を上げるときは、このファイルの ?v= をすべて同じ値にそろえる（tests/site.test.js で確認） -->
     <script type="importmap">
     {
         "imports": {
-            "./js/firebase.js": "./js/firebase.js?v=13",
-            "./js/image.js": "./js/image.js?v=13",
-            "./js/tree.js": "./js/tree.js?v=13",
-            "./js/ui/breadcrumb.js": "./js/ui/breadcrumb.js?v=13",
-            "./js/ui/bulkChipSheet.js": "./js/ui/bulkChipSheet.js?v=13",
-            "./js/ui/chipList.js": "./js/ui/chipList.js?v=13",
-            "./js/ui/chipSheet.js": "./js/ui/chipSheet.js?v=13",
-            "./js/ui/confirm.js": "./js/ui/confirm.js?v=13",
-            "./js/ui/dom.js": "./js/ui/dom.js?v=13",
-            "./js/ui/dragReorder.js": "./js/ui/dragReorder.js?v=13",
-            "./js/ui/folderList.js": "./js/ui/folderList.js?v=13",
-            "./js/ui/folderSheet.js": "./js/ui/folderSheet.js?v=13",
-            "./js/ui/help.js": "./js/ui/help.js?v=13",
-            "./js/ui/icons.js": "./js/ui/icons.js?v=13",
-            "./js/ui/reorderButtons.js": "./js/ui/reorderButtons.js?v=13",
-            "./js/ui/sheet.js": "./js/ui/sheet.js?v=13",
-            "./js/ui/tagFilter.js": "./js/ui/tagFilter.js?v=13",
-            "./js/ui/tagInput.js": "./js/ui/tagInput.js?v=13",
-            "./js/ui/tagManager.js": "./js/ui/tagManager.js?v=13",
-            "./js/ui/toast.js": "./js/ui/toast.js?v=13"
+            "./js/firebase.js": "./js/firebase.js?v=14",
+            "./js/image.js": "./js/image.js?v=14",
+            "./js/tree.js": "./js/tree.js?v=14",
+            "./js/ui/breadcrumb.js": "./js/ui/breadcrumb.js?v=14",
+            "./js/ui/bulkChipSheet.js": "./js/ui/bulkChipSheet.js?v=14",
+            "./js/ui/chipList.js": "./js/ui/chipList.js?v=14",
+            "./js/ui/chipSheet.js": "./js/ui/chipSheet.js?v=14",
+            "./js/ui/chipViewSwitch.js": "./js/ui/chipViewSwitch.js?v=14",
+            "./js/ui/confirm.js": "./js/ui/confirm.js?v=14",
+            "./js/ui/dom.js": "./js/ui/dom.js?v=14",
+            "./js/ui/dragReorder.js": "./js/ui/dragReorder.js?v=14",
+            "./js/ui/folderList.js": "./js/ui/folderList.js?v=14",
+            "./js/ui/folderSheet.js": "./js/ui/folderSheet.js?v=14",
+            "./js/ui/help.js": "./js/ui/help.js?v=14",
+            "./js/ui/iconPicker.js": "./js/ui/iconPicker.js?v=14",
+            "./js/ui/icons.js": "./js/ui/icons.js?v=14",
+            "./js/ui/reorderButtons.js": "./js/ui/reorderButtons.js?v=14",
+            "./js/ui/sheet.js": "./js/ui/sheet.js?v=14",
+            "./js/ui/tagFilter.js": "./js/ui/tagFilter.js?v=14",
+            "./js/ui/tagInput.js": "./js/ui/tagInput.js?v=14",
+            "./js/ui/tagManager.js": "./js/ui/tagManager.js?v=14",
+            "./js/ui/toast.js": "./js/ui/toast.js?v=14"
         }
     }
     </script>
@@ -63,6 +65,6 @@
 <body class="bg-bg text-text min-h-screen antialiased">
     <div id="app"></div>
     <div id="toast" class="fixed left-1/2 -translate-x-1/2 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-50 pointer-events-none"></div>
-    <script type="module" src="js/main.js?v=13"></script>
+    <script type="module" src="js/main.js?v=14"></script>
 </body>
 </html>

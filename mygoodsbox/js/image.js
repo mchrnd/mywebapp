@@ -1,8 +1,9 @@
-const MAX_SIDE = 128;
 const MAX_BYTES = 100 * 1024;
 
-// 長辺128pxに縮小したJPEGのデータURLを返す。読み込み不可・100KB超は例外
-export async function resizeToDataUrl(file) {
+// 長辺 maxSide px（初期値128。升目に大きく出すチップは256）に縮小したJPEGのデータURLを返す。
+// 読み込み不可・100KB超は例外
+export async function resizeToDataUrl(file, { maxSide = 128 } = {}) {
+    const MAX_SIDE = maxSide;
     let bitmap;
     try {
         bitmap = await createImageBitmap(file);

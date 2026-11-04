@@ -286,16 +286,36 @@ const sameTags = (a, b) => {
     const y = b || [];
     return x.length === y.length && x.every((t, i) => t === y[i]);
 };
-const sameIcon = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+// アイコンは項目ごとに比べる（Firestoreから戻る値は、項目の順番が違うことがある）
+const sameIcon = (a, b) => {
+    const x = a ?? null;
+    const y = b ?? null;
+    if (x === null || y === null) return x === y;
+    return x.type === y.type && x.value === y.value && (x.color ?? null) === (y.color ?? null);
+};
 
 // チップの保存内容。新規は全項目、編集は変わった項目だけ（ほかの端末での個数の増減を上書きしない）
 export function buildChipPatch(original, edited) {
-    if (!original) return { name: edited.name, count: edited.count, tags: edited.tags };
+    if (!original) return { name: edited.name, count: edited.count, tags: edited.tags, icon: edited.icon ?? null };
     const patch = {};
     if (edited.name !== original.name) patch.name = edited.name;
     if (edited.count !== original.count) patch.count = edited.count;
     if (!sameTags(edited.tags, original.tags)) patch.tags = edited.tags;
+    if ('icon' in edited && !sameIcon(edited.icon, original.icon)) patch.icon = edited.icon;
     return patch;
+}
+
+// アイコンのないチップを升目に出すときの、名前の最初の1文字
+export function initialOf(name) {
+    const text = typeof name === 'string' ? name.trim() : '';
+    const first = [...new Intl.Segmenter('ja').segment(text)][0];
+    return first ? first.segment.toUpperCase() : '?';
+}
+
+// チップの並べ方：1列・2段組・升目。知らない値（古い保存値など）は1列にする
+export const CHIP_VIEWS = ['list', 'columns', 'grid'];
+export function parseChipView(value) {
+    return CHIP_VIEWS.includes(value) ? value : 'list';
 }
 
 // フォルダーの編集内容。変わった項目だけを返す。別の親へ移動したときは、元の並び順を消す（clearOrder）

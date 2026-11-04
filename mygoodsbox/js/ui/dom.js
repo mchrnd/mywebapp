@@ -18,8 +18,9 @@ export function icon(name, cls = 'w-5 h-5') {
     return h('i', { 'data-lucide': name, class: cls });
 }
 
-export function tagPills(tags) {
+// wrap: false のときは1行に収め、はみ出す分は切る（2段組の狭いカード用）
+export function tagPills(tags, { wrap = true } = {}) {
     if (!tags || tags.length === 0) return null;
-    return h('div', { class: 'flex flex-wrap gap-1 mt-1' },
-        tags.map((t) => h('span', { class: 'text-xs px-1.5 py-0.5 rounded bg-bg text-primary border border-border' }, t)));
+    return h('div', { class: `flex gap-1 mt-1 ${wrap ? 'flex-wrap' : 'overflow-hidden'}` },
+        tags.map((t) => h('span', { class: 'shrink-0 text-xs px-1.5 py-0.5 rounded bg-bg text-primary border border-border' }, t)));
 }

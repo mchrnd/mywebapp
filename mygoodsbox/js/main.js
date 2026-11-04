@@ -5,8 +5,9 @@ import {
 import {
     getChildFolders, getChipsIn, getBreadcrumb, collectDescendants, tagSuggestions, chipNameSuggestions,
     tagCounts, filterByTags, pathLabel, renameTagUpdates, removeTagUpdates, moveWithinSiblings, moveToIndex,
-    buildChipPatch, buildFolderPatch,
+    buildChipPatch, buildFolderPatch, parseChipView,
 } from './tree.js';
+import { chipViewSwitch } from './ui/chipViewSwitch.js';
 import { openFolderSheet } from './ui/folderSheet.js';
 import { openChipSheet } from './ui/chipSheet.js';
 import { confirmDialog } from './ui/confirm.js';
@@ -22,6 +23,7 @@ import { openHelp, helpIcon } from './ui/help.js';
 import { openBulkChipSheet } from './ui/bulkChipSheet.js';
 
 const app = document.getElementById('app');
+const CHIP_VIEW_KEY = 'mygoodsbox.chipView'; // state より前に置く（state の初期化で読む）
 
 const state = {
     user: null,
@@ -37,7 +39,27 @@ const state = {
     tagQuery: '',
     reorderIn: null, // 並び替えモード中は { id: 開いているフォルダーのID（ホームは null） }
     loadError: false,
+    chipView: loadChipView(),
 };
+
+// チップの並べ方は、端末ごとに覚える（スマホとPCで別の表示にできる）。
+// 保存できない環境（プライベートブラウズなど）では、その場だけ切り替わる
+function loadChipView() {
+    try {
+        return parseChipView(localStorage.getItem(CHIP_VIEW_KEY));
+    } catch {
+        return 'list';
+    }
+}
+function setChipView(view) {
+    state.chipView = parseChipView(view);
+    try {
+        localStorage.setItem(CHIP_VIEW_KEY, state.chipView);
+    } catch {
+        // 保存できなくても、表示は切り替える
+    }
+    render();
+}
 
 // ログイン中のユーザーのID。ログアウト後に呼ばれたときは例外にして、保存処理の失敗として扱う
 function uid() {
@@ -335,9 +357,11 @@ function browserView() {
     const goTo = (id) => { state.selectedTags = []; state.currentId = id; render(); };
     const folderRoot = h('div', { class: 'grid gap-2' });
     const chipRoot = h('div', { class: 'grid gap-2 mt-2' });
-    // チップが表示されているときだけ、操作のしかたを案内する
+    // チップが表示されているときだけ、操作のしかたの案内と、並べ方の切り替えを出す
     const chipHint = (visible) => (visible
-        ? h('p', { class: 'text-xs text-muted mt-3' }, 'タップで個数が +1、－ボタンで -1。長押しで編集。')
+        ? h('div', { class: 'flex items-center justify-between gap-2 mt-3' },
+            h('p', { class: 'text-xs text-muted' }, 'タップで個数が +1、－ボタンで -1。長押しで編集。'),
+            chipViewSwitch({ view: state.chipView, onChange: setChipView }))
         : null);
 
     if (state.selectedTags.length > 0) {
@@ -351,6 +375,7 @@ function browserView() {
         });
         renderChipList(chipRoot, {
             chips: result.chips,
+            view: state.chipView,
             ...chipHandlers,
             subtitle: (c) => pathLabel(state.folders, c.folderId),
             onSubtitleClick: (c) => goTo(c.folderId),
@@ -382,6 +407,7 @@ function browserView() {
     });
     renderChipList(chipRoot, {
         chips,
+        view: state.chipView,
         ...chipHandlers,
         reorder: reordering
             ? { onUp: (id) => moveItem('chip', id, -1), onDown: (id) => moveItem('chip', id, 1), onMoveTo: (id, to) => moveItemTo('chip', id, to) }

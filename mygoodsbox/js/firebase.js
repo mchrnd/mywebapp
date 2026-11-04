@@ -67,8 +67,8 @@ export async function updateFolder(uid, id, patch, { clearOrder = false } = {}) 
     await updateDoc(folderDoc(uid, id), clearOrder ? { ...patch, order: deleteField() } : patch);
 }
 
-export async function addChip(uid, { name, folderId, count, tags }) {
-    await addDoc(chipsRef(uid), { name, folderId, count, tags, createdAt: serverTimestamp() });
+export async function addChip(uid, { name, folderId, count, tags, icon = null }) {
+    await addDoc(chipsRef(uid), { name, folderId, count, tags, icon, createdAt: serverTimestamp() });
 }
 
 export async function updateChip(uid, id, patch) {

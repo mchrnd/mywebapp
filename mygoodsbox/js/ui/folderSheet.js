@@ -1,26 +1,15 @@
 import { h } from './dom.js';
 import { openSheet } from './sheet.js';
 import { createTagInput } from './tagInput.js';
-import { renderIcon, PRESET_ICONS, ICON_COLORS, DEFAULT_ICON_COLOR } from './icons.js';
+import { createIconPicker } from './iconPicker.js';
 import { showToast } from './toast.js';
-import { resizeToDataUrl } from '../image.js';
 import { pathLabel, wouldCreateCycle } from '../tree.js';
-
-const MODES = [['none', 'なし'], ['image', '画像'], ['emoji', '絵文字'], ['preset', 'プリセット']];
-
-const firstGrapheme = (text) => {
-    const first = [...new Intl.Segmenter().segment(text.trim())][0];
-    return first ? first.segment : '';
-};
 
 // onSave(data) は Promise。成功したらシートを閉じ、失敗したらトーストを出して開いたままにする
 // onDelete() は Promise<boolean>（削除したら true）。onDuplicate() は、編集シートを閉じて複製用の追加シートを開く
 // prefill: 追加シート（folder が null）の入力欄に、複製元の設定を入れておく
 export function openFolderSheet({ folder, prefill = null, parentId, folders, suggestTags, onSave, onDelete, onDuplicate }) {
     const base = folder || prefill;
-    let iconValue = base && base.icon ? base.icon : null;
-    let mode = iconValue ? iconValue.type : 'none';
-    let presetColor = iconValue && iconValue.type === 'preset' && iconValue.color ? iconValue.color : DEFAULT_ICON_COLOR;
     let close = () => {};
 
     const nameInput = h('input', {
@@ -31,80 +20,10 @@ export function openFolderSheet({ folder, prefill = null, parentId, folders, sug
     });
     const error = h('p', { class: 'text-sm text-danger min-h-[1.25rem]' });
     const tagInput = createTagInput({ getSuggestions: suggestTags, initial: base ? base.tags || [] : [] });
-
-    const modeRoot = h('div', { class: 'flex flex-wrap gap-2' });
-    const iconPanel = h('div', { class: 'mt-2' });
-    const preview = h('div', { class: 'flex items-center gap-2 mb-2 text-sm text-muted' });
-
-    function refreshIcon() {
-        modeRoot.replaceChildren(...MODES.map(([key, label]) => h('button', {
-            type: 'button',
-            class: `px-3 py-1 rounded-full border text-sm ${mode === key ? 'bg-primary text-white border-primary' : 'border-border'}`,
-            onClick: () => {
-                mode = key;
-                if (key === 'none') iconValue = null;
-                else if (iconValue && iconValue.type !== key) iconValue = null;
-                refreshIcon();
-            },
-        }, label)));
-        preview.replaceChildren(renderIcon(iconValue), h('span', {}, iconValue ? 'このアイコンを使います' : 'アイコンなし'));
-
-        if (mode === 'image') {
-            iconPanel.replaceChildren(h('input', {
-                type: 'file',
-                accept: 'image/*',
-                class: 'text-sm',
-                onChange: async (e) => {
-                    const file = e.target.files[0];
-                    if (!file) return;
-                    try {
-                        iconValue = { type: 'image', value: await resizeToDataUrl(file) };
-                        error.textContent = '';
-                    } catch (err) {
-                        error.textContent = err.message; // アイコンは変更しない
-                    }
-                    refreshIcon();
-                },
-            }));
-        } else if (mode === 'emoji') {
-            iconPanel.replaceChildren(h('input', {
-                type: 'text',
-                class: 'w-24 border border-border rounded-lg px-3 py-2 bg-surface text-xl text-center',
-                placeholder: '😀',
-                value: iconValue ? iconValue.value : '',
-                onInput: (e) => {
-                    const g = firstGrapheme(e.target.value);
-                    iconValue = g ? { type: 'emoji', value: g } : null;
-                    preview.replaceChildren(renderIcon(iconValue), h('span', {}, iconValue ? 'このアイコンを使います' : 'アイコンなし'));
-                },
-            }));
-        } else if (mode === 'preset') {
-            const withColor = (value) => ({ type: 'preset', value, color: presetColor });
-            iconPanel.replaceChildren(
-                h('div', { class: 'grid grid-cols-6 gap-2' }, PRESET_ICONS.map((name) => h('button', {
-                    type: 'button',
-                    'aria-label': name,
-                    class: `h-11 flex items-center justify-center rounded-lg border ${iconValue && iconValue.value === name ? 'border-primary bg-bg' : 'border-border'}`,
-                    onClick: () => { iconValue = withColor(name); refreshIcon(); },
-                }, renderIcon(withColor(name), 'w-5 h-5 text-primary')))),
-                h('div', { class: 'flex flex-wrap gap-2 mt-3', role: 'group', 'aria-label': 'アイコンの色' }, ICON_COLORS.map((c) => h('button', {
-                    type: 'button',
-                    'aria-label': c.label,
-                    'aria-pressed': presetColor === c.value ? 'true' : 'false',
-                    title: c.label,
-                    class: `w-9 h-9 rounded-full border-2 ${presetColor === c.value ? 'border-text' : 'border-border'}`,
-                    style: `background:${c.value}`,
-                    onClick: () => {
-                        presetColor = c.value;
-                        if (iconValue && iconValue.type === 'preset') iconValue = withColor(iconValue.value);
-                        refreshIcon();
-                    },
-                }))));
-        } else {
-            iconPanel.replaceChildren();
-        }
-        window.lucide?.createIcons();
-    }
+    const iconPicker = createIconPicker({
+        initial: base && base.icon ? base.icon : null,
+        onError: (message) => { error.textContent = message; },
+    });
 
     let moveSelect = null;
     if (folder) {
@@ -135,7 +54,7 @@ export function openFolderSheet({ folder, prefill = null, parentId, folders, sug
                 name,
                 parentId: moveSelect ? (moveSelect.value || null) : parentId,
                 tags: tagInput.getTags(),
-                icon: iconValue,
+                icon: iconPicker.getIcon(),
             };
             const pending = Promise.resolve().then(() => onSave(data));
             close();
@@ -143,11 +62,10 @@ export function openFolderSheet({ folder, prefill = null, parentId, folders, sug
         },
     }, '保存');
 
-    refreshIcon();
     close = openSheet(h('div', {},
         h('h2', { class: 'text-lg font-bold' }, folder ? 'フォルダーを編集' : prefill ? 'フォルダーを複製' : 'フォルダーを追加'),
         label('名前'), nameInput,
-        label('アイコン'), preview, modeRoot, iconPanel,
+        label('アイコン'), iconPicker.element,
         label('タグ'), tagInput.element,
         folder ? label('移動先') : null, moveSelect,
         error,

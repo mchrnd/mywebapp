@@ -4,6 +4,7 @@ import {
     normalizeTag, normalizeTags, getChildFolders, getChipsIn, getBreadcrumb, getSiblings,
     pathLabel, collectDescendants, wouldCreateCycle, allTags, filterByTags,
     chipNameSuggestions, tagSuggestions, chunkIds, parseCount, tagCounts, visibleFilterTags, renameTagUpdates, removeTagUpdates, moveWithinSiblings, moveToIndex, parseChipNames, splitNewNames, buildChipPatch, buildFolderPatch,
+    initialOf, parseChipView, CHIP_VIEWS,
 } from '../mygoodsbox/js/tree.js';
 
 const f = (id, name, parentId, tags = []) => ({ id, name, parentId, tags, icon: null, createdAt: 0 });
@@ -257,7 +258,7 @@ test('moveToIndex clamps the target and does nothing when the position is unchan
 });
 
 test('buildChipPatch sends every field for a new chip and only changed fields for an edit', () => {
-    assert.deepEqual(buildChipPatch(null, { name: 'A', count: 1, tags: ['t'] }), { name: 'A', count: 1, tags: ['t'] });
+    assert.deepEqual(buildChipPatch(null, { name: 'A', count: 1, tags: ['t'] }), { name: 'A', count: 1, tags: ['t'], icon: null });
     const original = c('x', 'A', 'F', 5, ['t']);
     // 名前だけ変えたときは、個数を書き戻さない（ほかの端末での増減を消さない）
     assert.deepEqual(buildChipPatch(original, { name: 'B', count: 5, tags: ['t'] }), { name: 'B' });
@@ -278,6 +279,36 @@ test('buildFolderPatch sends only changed fields and clears order when the paren
     assert.deepEqual(buildFolderPatch({ ...original, order: undefined }, { ...same, parentId: null }), { patch: { parentId: null }, clearOrder: false });
     assert.deepEqual(buildFolderPatch(original, { ...same, icon: null }), { patch: { icon: null }, clearOrder: false });
     assert.deepEqual(buildFolderPatch({ ...original, icon: undefined, tags: undefined }, { ...same, icon: null, tags: [] }), { patch: {}, clearOrder: false });
+});
+
+test('buildChipPatch includes the icon only when it changes', () => {
+    const star = { type: 'preset', value: 'star', color: '#ef4444' };
+    assert.deepEqual(buildChipPatch(null, { name: 'A', count: 1, tags: [], icon: star }), { name: 'A', count: 1, tags: [], icon: star });
+    const original = { ...c('x', 'A', 'F', 5, []), icon: star };
+    const same = { name: 'A', count: 5, tags: [], icon: { ...star } };
+    assert.deepEqual(buildChipPatch(original, same), {});
+    // Firestoreから戻る値は、項目の順番が違うことがある
+    assert.deepEqual(buildChipPatch(original, { ...same, icon: { color: '#ef4444', value: 'star', type: 'preset' } }), {});
+    assert.deepEqual(buildChipPatch(original, { ...same, icon: null }), { icon: null });
+    const emoji = { type: 'emoji', value: '🎀' };
+    assert.deepEqual(buildChipPatch(c('x', 'A', 'F', 5, []), { ...same, icon: emoji }), { icon: emoji });
+});
+
+test('initialOf returns the first character of a name for icon-less tiles', () => {
+    assert.equal(initialOf('abc'), 'A');
+    assert.equal(initialOf('  キャラA'), 'キ');
+    assert.equal(initialOf('👨‍👩‍👧 家族'), '👨‍👩‍👧');
+    assert.equal(initialOf(''), '?');
+    assert.equal(initialOf(undefined), '?');
+});
+
+test('parseChipView accepts known views and falls back to the list', () => {
+    assert.deepEqual(CHIP_VIEWS, ['list', 'columns', 'grid']);
+    assert.equal(parseChipView('grid'), 'grid');
+    assert.equal(parseChipView('columns'), 'columns');
+    assert.equal(parseChipView('list'), 'list');
+    assert.equal(parseChipView('tiles'), 'list');
+    assert.equal(parseChipView(null), 'list');
 });
 
 test('tag helpers stay fast with thousands of folders', () => {
