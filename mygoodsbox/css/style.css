@@ -38,6 +38,12 @@ body {
     user-select: none;
 }
 
+/* 長押しの中の画像：保存メニューやドラッグを出さず、長押しを親（チップ）で受ける */
+.no-callout img {
+    -webkit-user-drag: none;
+    pointer-events: none;
+}
+
 /* 並び替えモードの長押しドラッグ */
 .drag-row {
     transition: transform 0.15s;

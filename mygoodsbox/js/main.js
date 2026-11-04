@@ -362,7 +362,7 @@ function browserView() {
     // switchOnPc: false のときは、PC幅（640px以上）では切り替えを出さない（上の「並び替え」の横に出すため）
     const chipHint = (visible, { switchOnPc = true } = {}) => (visible
         ? h('div', { class: 'flex items-center justify-between gap-2 mt-3' },
-            h('p', { class: 'text-xs text-muted' }, 'タップで個数が +1、－ボタンで -1。長押しで編集。'),
+            h('p', { class: 'text-xs text-muted' }, 'タップで個数が +1（アイコンを除く）、－ボタンで -1。長押しで編集。'),
             switchOnPc ? viewSwitch() : h('div', { class: 'sm:hidden' }, viewSwitch()))
         : null);
 
