@@ -5,9 +5,10 @@ import {
 import {
     getChildFolders, getChipsIn, getBreadcrumb, collectDescendants, tagSuggestions, chipNameSuggestions,
     tagCounts, filterByTags, pathLabel, renameTagUpdates, removeTagUpdates, moveWithinSiblings, moveToIndex,
-    buildChipPatch, buildFolderPatch, parseChipView, backStep,
+    buildChipPatch, buildFolderPatch, parseChipView, backStep, descendantFolderIds,
 } from './tree.js';
-import { chipViewSwitch } from './ui/chipViewSwitch.js';
+import { chipViewSwitch, chipNamesToggle } from './ui/chipViewSwitch.js';
+import { renderAccordion } from './ui/accordion.js';
 import { openFolderSheet } from './ui/folderSheet.js';
 import { openChipSheet } from './ui/chipSheet.js';
 import { confirmDialog } from './ui/confirm.js';
@@ -24,6 +25,7 @@ import { openBulkChipSheet } from './ui/bulkChipSheet.js';
 
 const app = document.getElementById('app');
 const CHIP_VIEW_KEY = 'mygoodsbox.chipView'; // state より前に置く（state の初期化で読む）
+const CHIP_NAMES_KEY = 'mygoodsbox.chipNames'; // 確認モードの升目で名前を出すか（'0' なら隠す）
 
 const state = {
     user: null,
@@ -40,7 +42,41 @@ const state = {
     reorderIn: null, // 並び替えモード中は { id: 開いているフォルダーのID（ホームは null） }
     loadError: false,
     chipView: loadChipView(),
+    mode: 'edit', // 'edit'（編集モード）| 'check'（確認モード）。アプリを開いたときは、いつも編集モード
+    openFolders: new Set(), // 確認モードのアコーディオンで開いているフォルダーのID（保存しない）
+    showChipNames: loadChipNames(),
 };
+
+// 確認モードの升目で、チップの名前を出すか。端末ごとに覚える
+function loadChipNames() {
+    try {
+        return localStorage.getItem(CHIP_NAMES_KEY) !== '0';
+    } catch {
+        return true;
+    }
+}
+function setChipNames(shown) {
+    state.showChipNames = shown;
+    try {
+        localStorage.setItem(CHIP_NAMES_KEY, shown ? '1' : '0');
+    } catch {
+        // 保存できなくても、表示は切り替える
+    }
+    render();
+}
+
+// 編集モードと確認モードの切り替え。今いるフォルダーとタグの選択はそのまま。
+// 確認モードでは並び替えを終え、追加のメニューを閉じる
+function setMode(mode) {
+    if (state.mode === mode) return;
+    state.mode = mode;
+    if (mode === 'check') {
+        state.reorderIn = null;
+        state.fabOpen = false;
+    }
+    state.menuOpen = false;
+    render();
+}
 
 // チップの並べ方は、端末ごとに覚える（スマホとPCで別の表示にできる）。
 // 保存できない環境（プライベートブラウズなど）では、その場だけ切り替わる
@@ -254,6 +290,8 @@ function stopSubscription() {
     state.tagQuery = '';
     state.reorderIn = null;
     state.loadError = false;
+    state.mode = 'edit';
+    state.openFolders = new Set();
 }
 
 function loginView() {
@@ -277,6 +315,19 @@ function goHome() {
     state.fabOpen = false;
     render();
     window.scrollTo(0, 0);
+}
+
+// ヘッダーの「編集｜確認」の切り替え
+function modeSwitch() {
+    const button = (mode, label) => h('button', {
+        type: 'button',
+        class: `px-2.5 py-1 rounded-md text-sm ${state.mode === mode ? 'bg-surface text-primary font-bold' : 'text-white'}`,
+        'aria-pressed': state.mode === mode ? 'true' : 'false',
+        onClick: () => setMode(mode),
+    }, label);
+    return h('div', { class: 'flex shrink-0 rounded-lg bg-primary-dark p-0.5 mr-1', role: 'group', 'aria-label': 'モードの切り替え' },
+        button('edit', '編集'),
+        button('check', '確認'));
 }
 
 function headerView() {
@@ -310,6 +361,7 @@ function headerView() {
             icon('box', 'w-6 h-6'),
             h('h1', { class: 'text-lg font-bold' }, 'グッズ管理')),
             h('div', { class: 'relative flex items-center gap-1' },
+                modeSwitch(),
                 h('button', {
                     type: 'button',
                     class: 'w-10 h-10 flex items-center justify-center rounded-full hover:bg-primary-dark',
@@ -324,6 +376,74 @@ function headerView() {
                     onClick: (e) => { e.stopPropagation(); state.menuOpen = !state.menuOpen; state.fabOpen = false; render(); },
                 }, icon('user', 'w-5 h-5')),
                 menu)));
+}
+
+// 確認モードの画面：今いるフォルダー（絞り込み中は結果）を起点にしたアコーディオン。見るだけで、長押しで編集
+function checkView(filterRoot, goTo) {
+    const filtering = state.selectedTags.length > 0;
+    const result = filtering ? filterByTags(state.folders, state.chips, state.selectedTags) : null;
+    const topFolders = filtering ? result.folders : getChildFolders(state.folders, state.currentId);
+    const topChips = filtering ? result.chips : getChipsIn(state.chips, state.currentId);
+    // 「すべて開く／閉じる」の対象：今いるフォルダーより下（絞り込み中は、結果のフォルダーとその下）
+    const scopeIds = filtering
+        ? topFolders.flatMap((f) => [f.id, ...descendantFolderIds(state.folders, f.id)])
+        : descendantFolderIds(state.folders, state.currentId);
+    const setOpen = (ids, open) => {
+        ids.forEach((id) => (open ? state.openFolders.add(id) : state.openFolders.delete(id)));
+        render();
+    };
+    const smallButton = (label, iconName, onClick) => h('button', {
+        type: 'button',
+        class: 'flex items-center gap-1 px-3 py-1.5 rounded-full text-sm border border-primary text-primary bg-surface',
+        onClick,
+    }, icon(iconName, 'w-4 h-4'), label);
+
+    const toolbar = h('div', { class: 'flex flex-wrap items-center justify-between gap-2 mb-2' },
+        h('div', { class: 'flex gap-2' },
+            scopeIds.length > 0 ? smallButton('すべて開く', 'chevrons-up-down', () => setOpen(scopeIds, true)) : null,
+            scopeIds.length > 0 ? smallButton('すべて閉じる', 'chevrons-down-up', () => setOpen(scopeIds, false)) : null),
+        h('div', { class: 'flex items-center gap-2 ml-auto' },
+            state.chipView === 'grid' ? chipNamesToggle({ shown: state.showChipNames, onChange: setChipNames }) : null,
+            chipViewSwitch({ view: state.chipView, onChange: setChipView })));
+
+    let crumbRoot = null;
+    if (!filtering) {
+        crumbRoot = h('div', { class: 'mb-3' });
+        renderBreadcrumb(crumbRoot, {
+            folders: state.folders,
+            currentId: state.currentId,
+            onNavigate: (id) => { state.currentId = id; render(); },
+        });
+    }
+
+    const accordionRoot = h('div', { class: 'grid gap-2' });
+    renderAccordion(accordionRoot, {
+        folders: state.folders,
+        chips: state.chips,
+        topChips,
+        topFolders,
+        open: state.openFolders,
+        view: state.chipView,
+        showNames: state.showChipNames,
+        onToggle: (id) => setOpen([id], !state.openFolders.has(id)),
+        onEditFolder: editFolder,
+        onEditChip: editChip,
+        ...(filtering
+            ? {
+                folderSubtitle: (f) => pathLabel(state.folders, f.id),
+                onFolderSubtitleClick: (f) => goTo(f.id),
+                chipSubtitle: (c) => pathLabel(state.folders, c.folderId),
+                onChipSubtitleClick: (c) => goTo(c.folderId),
+            }
+            : {}),
+    });
+
+    const empty = topFolders.length === 0 && topChips.length === 0
+        ? h('p', { class: 'text-center text-muted py-12' },
+            filtering ? '該当するものはありません' : state.currentId === null ? 'フォルダーがまだありません' : 'このフォルダーはまだ空です')
+        : null;
+    const hint = empty ? null : h('p', { class: 'text-xs text-muted mb-2' }, '見出しのタップで開閉。長押しで編集。');
+    return h('main', { class: 'max-w-3xl mx-auto p-4 pb-28' }, filterRoot, crumbRoot, empty ? null : toolbar, hint, accordionRoot, empty);
 }
 
 function browserView() {
@@ -351,6 +471,9 @@ function browserView() {
         onQuery: (q) => { state.tagQuery = q; },
     });
 
+    const goTo = (id) => { state.selectedTags = []; state.currentId = id; render(); };
+    if (state.mode === 'check') return checkView(filterRoot, goTo);
+
     const chipHandlers = {
         onPlus: (id) => bump(id, 1),
         onMinus: (id) => {
@@ -359,7 +482,6 @@ function browserView() {
         },
         onEdit: editChip,
     };
-    const goTo = (id) => { state.selectedTags = []; state.currentId = id; render(); };
     const folderRoot = h('div', { class: 'grid gap-2' });
     const chipRoot = h('div', { class: 'grid gap-2 mt-2' });
     const viewSwitch = () => chipViewSwitch({ view: state.chipView, onChange: setChipView });
@@ -477,7 +599,9 @@ function render() {
         const selection = focusKey && typeof active.selectionStart === 'number'
             ? [active.selectionStart, active.selectionEnd]
             : null;
-        app.replaceChildren(headerView(), browserView(), ...(state.selectedTags.length > 0 || state.reorderIn ? [] : [fabView()]));
+        // 右下の＋（追加）は、編集モードで、絞り込みも並び替えもしていないときだけ出す
+        const showFab = state.mode === 'edit' && state.selectedTags.length === 0 && !state.reorderIn;
+        app.replaceChildren(headerView(), browserView(), ...(showFab ? [fabView()] : []));
         if (tagManager && tagManager.isOpen()) tagManager.refresh();
         if (focusKey) {
             const el = app.querySelector(`[data-focus-key="${focusKey}"]`);
