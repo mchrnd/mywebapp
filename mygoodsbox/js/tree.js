@@ -370,3 +370,82 @@ export function buildFolderPatch(original, edited) {
     const clearOrder = 'parentId' in patch && typeof original.order === 'number';
     return { patch, clearOrder };
 }
+
+// 検索の当て方：英字だけ、全角と半角、大文字と小文字を区別しない。
+// ひらがなとカタカナ、カナや数字の全角と半角は区別する（そのまま比べる）
+export function normalizeSearchText(text) {
+    return String(text ?? '')
+        .replace(/[Ａ-Ｚａ-ｚ]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0))
+        .replace(/[A-Z]/g, (ch) => ch.toLowerCase());
+}
+
+// 名前の検索。targets: { chips, folders }（folders はフォルダーの名前とメモ）。
+// 範囲は scopeId より下の階層すべて（scopeId のフォルダーに直接入っているチップを含む。フォルダー自身は当てない）。
+// タグを選んでいるときは、全体から探し、すべてのタグを持つものだけを当てる。
+// 戻り値は、ふだんの一覧と同じ順（階層の上から）のフォルダーごとのまとまり：
+//   { folder, whole: true, chips: [] }  … フォルダー自身が当たった（中身は全部）
+//   { folder, whole: false, chips }     … 当たったチップだけ
+export function searchGroups(folders, chips, { query, targets, scopeId, tags }) {
+    const q = normalizeSearchText(String(query ?? '').trim());
+    if (!q) return [];
+    const start = tags.length > 0 ? null : scopeId;
+    const hasTags = (item) => tags.every((t) => (item.tags || []).includes(t));
+    const hit = (text) => normalizeSearchText(text).includes(q);
+
+    const children = new Map();
+    for (const folder of folders) {
+        if (!children.has(folder.parentId)) children.set(folder.parentId, []);
+        children.get(folder.parentId).push(folder);
+    }
+    const chipsByFolder = new Map();
+    for (const chip of chips) {
+        if (!chipsByFolder.has(chip.folderId)) chipsByFolder.set(chip.folderId, []);
+        chipsByFolder.get(chip.folderId).push(chip);
+    }
+
+    // 上から順にたどる（同じ階層は並び順）。輪になったデータでも、同じフォルダーへは2度入らない
+    const byId = indexById(folders);
+    const order = [];
+    const seen = new Set();
+    const stack = start === null ? [] : [byId.get(start)].filter(Boolean);
+    if (start === null) stack.push(...[...(children.get(null) || [])].sort(byOrder).reverse());
+    while (stack.length > 0) {
+        const folder = stack.pop();
+        if (seen.has(folder.id)) continue;
+        seen.add(folder.id);
+        order.push(folder);
+        stack.push(...[...(children.get(folder.id) || [])].sort(byOrder).reverse());
+    }
+
+    const groups = [];
+    for (const folder of order) {
+        const isScope = folder.id === start;
+        if (targets.folders && !isScope && hasTags(folder) && (hit(folder.name) || hit(folder.memo))) {
+            groups.push({ folder, whole: true, chips: [] });
+            continue;
+        }
+        if (!targets.chips) continue;
+        const found = (chipsByFolder.get(folder.id) || []).filter((chip) => hasTags(chip) && hit(chip.name));
+        if (found.length > 0) groups.push({ folder, whole: false, chips: found.sort(byOrder) });
+    }
+    return groups;
+}
+
+// 検索の対象（チップ／フォルダー）。端末に 'chips' | 'folders' | 'both' で覚える。最初はチップだけ
+export function parseSearchTargets(value) {
+    if (value === 'folders') return { chips: false, folders: true };
+    if (value === 'both') return { chips: true, folders: true };
+    return { chips: true, folders: false };
+}
+
+export const searchTargetsKey = (targets) => (targets.chips && targets.folders ? 'both' : targets.folders ? 'folders' : 'chips');
+
+// 対象のON/OFFを切り替える。両方OFFにはしない（最後の1つは消せない）
+export function toggleSearchTarget(targets, key) {
+    const next = { ...targets, [key]: !targets[key] };
+    return next.chips || next.folders ? next : targets;
+}
+
+export function searchTargetsLabel(targets) {
+    return [targets.chips ? 'チップ名' : null, targets.folders ? 'フォルダー名・メモ' : null].filter(Boolean).join('・');
+}

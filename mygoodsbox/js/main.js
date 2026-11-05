@@ -6,9 +6,11 @@ import {
     getChildFolders, getChipsIn, getBreadcrumb, collectDescendants, tagSuggestions, chipNameSuggestions,
     tagCounts, filterByTags, pathLabel, renameTagUpdates, removeTagUpdates, moveWithinSiblings, moveToIndex,
     buildChipPatch, buildFolderPatch, parseChipView, backStep, descendantFolderIds,
+    searchGroups, parseSearchTargets, searchTargetsKey, toggleSearchTarget, searchTargetsLabel,
 } from './tree.js';
 import { chipViewSwitch, chipNamesToggle, chipTagsToggle, folderMemosToggle } from './ui/chipViewSwitch.js';
-import { renderAccordion } from './ui/accordion.js';
+import { renderAccordion, renderSearchAccordion } from './ui/accordion.js';
+import { searchOpenButton, searchPanel, SEARCH_FOCUS_KEY } from './ui/searchBar.js';
 import { openFolderSheet } from './ui/folderSheet.js';
 import { openChipSheet } from './ui/chipSheet.js';
 import { confirmDialog } from './ui/confirm.js';
@@ -28,6 +30,7 @@ const CHIP_VIEW_KEY = 'mygoodsbox.chipView'; // state より前に置く（state
 const CHIP_NAMES_KEY = 'mygoodsbox.chipNames'; // 確認モードの升目で名前を出すか（'0' なら隠す）
 const CHIP_TAGS_KEY = 'mygoodsbox.chipTags'; // 確認モードの1列・2段組でタグを出すか（'0' なら隠す）
 const FOLDER_MEMOS_KEY = 'mygoodsbox.folderMemos'; // フォルダーのメモを出すか（'0' なら隠す。両モード共通）
+const SEARCH_TARGETS_KEY = 'mygoodsbox.searchTargets'; // 検索の対象（'chips' | 'folders' | 'both'）
 
 const state = {
     user: null,
@@ -49,7 +52,40 @@ const state = {
     showChipNames: loadShown(CHIP_NAMES_KEY),
     showChipTags: loadShown(CHIP_TAGS_KEY),
     showFolderMemos: loadShown(FOLDER_MEMOS_KEY),
+    searchOpen: false, // 名前の検索欄を開いているか
+    searchQuery: '',
+    searchTargets: loadSearchTargets(),
 };
+
+function loadSearchTargets() {
+    try {
+        return parseSearchTargets(localStorage.getItem(SEARCH_TARGETS_KEY));
+    } catch {
+        return parseSearchTargets(null);
+    }
+}
+function toggleTarget(key) {
+    state.searchTargets = toggleSearchTarget(state.searchTargets, key);
+    try {
+        localStorage.setItem(SEARCH_TARGETS_KEY, searchTargetsKey(state.searchTargets));
+    } catch {
+        // 保存できなくても、対象は切り替える
+    }
+    render();
+}
+// 検索欄を開く（並び替えは終える）／閉じる（検索の文字も消す）
+function openSearch() {
+    state.searchOpen = true;
+    state.reorderIn = null;
+    state.fabOpen = false;
+    render();
+    app.querySelector(`[data-focus-key="${SEARCH_FOCUS_KEY}"]`)?.focus();
+}
+function closeSearch() {
+    state.searchOpen = false;
+    state.searchQuery = '';
+}
+const searching = () => state.searchOpen && state.searchQuery.trim() !== '';
 
 // 確認モードの表示の出す/隠す（升目の名前、1列・2段組のタグ）。端末ごとに覚える。読めないときは出す
 function loadShown(key) {
@@ -313,6 +349,7 @@ function stopSubscription() {
     state.loadError = false;
     state.mode = 'edit';
     state.openFolders = new Set();
+    closeSearch();
 }
 
 function loginView() {
@@ -334,6 +371,7 @@ function goHome() {
     state.reorderIn = null;
     state.menuOpen = false;
     state.fabOpen = false;
+    closeSearch();
     render();
     window.scrollTo(0, 0);
 }
@@ -401,13 +439,16 @@ function headerView() {
 }
 
 // 確認モードの画面：今いるフォルダー（絞り込み中は結果）を起点にしたアコーディオン。見るだけで、長押しで編集
-function checkView(filterRoot, goTo) {
+function checkView(top, goTo) {
     const filtering = state.selectedTags.length > 0;
-    const result = filtering ? filterByTags(state.folders, state.chips, state.selectedTags) : null;
-    const topFolders = filtering ? result.folders : getChildFolders(state.folders, state.currentId);
-    const topChips = filtering ? result.chips : getChipsIn(state.chips, state.currentId);
-    // 「すべて開く／閉じる」の対象：今いるフォルダーより下（絞り込み中は、結果のフォルダーとその下）
-    const scopeIds = filtering
+    const groups = searching() ? findGroups() : null;
+    const result = filtering && !groups ? filterByTags(state.folders, state.chips, state.selectedTags) : null;
+    // 検索中は、フォルダー自身が当たったまとまりを「すべて開く」などの対象にする
+    const topFolders = groups ? groups.filter((g) => g.whole).map((g) => g.folder)
+        : filtering ? result.folders : getChildFolders(state.folders, state.currentId);
+    const topChips = groups ? [] : filtering ? result.chips : getChipsIn(state.chips, state.currentId);
+    // 「すべて開く／閉じる」の対象：今いるフォルダーより下（絞り込み中や検索中は、結果のフォルダーとその下）
+    const scopeIds = filtering || groups
         ? topFolders.flatMap((f) => [f.id, ...descendantFolderIds(state.folders, f.id)])
         : descendantFolderIds(state.folders, state.currentId);
     const setOpen = (ids, open) => {
@@ -443,7 +484,7 @@ function checkView(filterRoot, goTo) {
     }
 
     const accordionRoot = h('div', { class: 'grid gap-2' });
-    renderAccordion(accordionRoot, {
+    const accordionProps = {
         folders: state.folders,
         chips: state.chips,
         topChips,
@@ -456,7 +497,7 @@ function checkView(filterRoot, goTo) {
         onToggle: (id) => setOpen([id], !state.openFolders.has(id)),
         onEditFolder: editFolder,
         onEditChip: editChip,
-        ...(filtering
+        ...(filtering || groups
             ? {
                 folderSubtitle: (f) => pathLabel(state.folders, f.id),
                 onFolderSubtitleClick: (f) => goTo(f.id),
@@ -464,27 +505,42 @@ function checkView(filterRoot, goTo) {
                 onChipSubtitleClick: (c) => goTo(c.folderId),
             }
             : {}),
-    });
+    };
+    if (groups) renderSearchAccordion(accordionRoot, { ...accordionProps, groups, groupHeading: (f) => groupHeading(f, goTo) });
+    else renderAccordion(accordionRoot, accordionProps);
 
-    const empty = topFolders.length === 0 && topChips.length === 0
+    const nothing = groups ? groups.length === 0 : topFolders.length === 0 && topChips.length === 0;
+    const empty = nothing
         ? h('p', { class: 'text-center text-muted py-12' },
-            filtering ? '該当するものはありません' : state.currentId === null ? 'フォルダーがまだありません' : 'このフォルダーはまだ空です')
+            groups ? noSearchResults() : filtering ? '該当するものはありません' : state.currentId === null ? 'フォルダーがまだありません' : 'このフォルダーはまだ空です')
         : null;
     const hint = empty ? null : h('p', { class: 'text-xs text-muted mb-2' }, '見出しのタップで開閉。長押しで編集。');
-    return h('main', { class: 'max-w-3xl mx-auto p-4 pb-28' }, filterRoot, crumbRoot, empty ? null : toolbar, hint, accordionRoot, empty);
+    return page(top, [crumbRoot, empty ? null : toolbar, hint, accordionRoot, empty]);
 }
 
-function browserView() {
-    // 開いていたフォルダーが別端末で削除された場合は、ホームへ戻る
-    if (state.currentId !== null && getBreadcrumb(state.folders, state.currentId).length === 0) {
-        state.currentId = null;
-    }
-    // 別端末でタグが消えた場合は、選択中のタグから外す
-    const counts = tagCounts(state.folders, state.chips);
-    state.selectedTags = state.selectedTags.filter((t) => counts.some((x) => x.tag === t));
+// 画面の本体。検索欄より下（data-body）は、検索の文字を打つたびにここだけ描き直す（refreshBody）
+const page = (top, rest) => h('main', { class: 'max-w-3xl mx-auto p-4 pb-28' }, top, h('div', { 'data-body': true }, rest));
 
-    const filterRoot = h('div', { class: 'mb-3' });
-    renderTagFilter(filterRoot, {
+const findGroups = () => searchGroups(state.folders, state.chips, {
+    query: state.searchQuery,
+    targets: state.searchTargets,
+    scopeId: state.currentId,
+    tags: state.selectedTags,
+});
+const noSearchResults = () => `該当するものはありません（${searchTargetsLabel(state.searchTargets)}で探しています）`;
+
+// 検索結果で、チップが当たったまとまりの見出し（経路）。タップでそのフォルダーへ移る
+const groupHeading = (folder, goTo) => h('button', {
+    type: 'button',
+    class: 'flex items-center gap-1.5 max-w-full text-left text-sm font-medium text-primary mt-1 px-1',
+    'data-group-heading': true,
+    onClick: () => goTo(folder.id),
+}, icon('folder-open', 'w-4 h-4 shrink-0'), h('span', { class: 'truncate underline' }, pathLabel(state.folders, folder.id)));
+
+// 検索欄とタグの列（画面の上の部分）
+function topArea(counts) {
+    const tagRoot = h('div', { class: 'min-w-0 flex-1' });
+    renderTagFilter(tagRoot, {
         counts,
         selected: state.selectedTags,
         onToggle: (tag) => {
@@ -498,9 +554,41 @@ function browserView() {
         query: state.tagQuery,
         onQuery: (q) => { state.tagQuery = q; },
     });
+    const folder = state.folders.find((f) => f.id === state.currentId);
+    const scopeLabel = state.selectedTags.length > 0 || !folder ? '全体を検索' : `「${folder.name}」の中を検索`;
+    return h('div', { class: 'mb-3' },
+        h('div', { class: 'flex items-start gap-2' },
+            searchOpenButton({
+                open: state.searchOpen,
+                onClick: () => { if (state.searchOpen) { closeSearch(); render(); } else openSearch(); },
+            }),
+            tagRoot),
+        state.searchOpen
+            ? searchPanel({
+                query: state.searchQuery,
+                onQuery: (text) => { state.searchQuery = text; refreshBody(); },
+                onComposing: setComposing,
+                targets: state.searchTargets,
+                onToggleTarget: toggleTarget,
+                scopeLabel,
+                onClose: () => { closeSearch(); render(); },
+            })
+            : null);
+}
 
-    const goTo = (id) => { state.selectedTags = []; state.currentId = id; render(); };
-    if (state.mode === 'check') return checkView(filterRoot, goTo);
+function browserView() {
+    // 開いていたフォルダーが別端末で削除された場合は、ホームへ戻る
+    if (state.currentId !== null && getBreadcrumb(state.folders, state.currentId).length === 0) {
+        state.currentId = null;
+    }
+    // 別端末でタグが消えた場合は、選択中のタグから外す
+    const counts = tagCounts(state.folders, state.chips);
+    state.selectedTags = state.selectedTags.filter((t) => counts.some((x) => x.tag === t));
+
+    const top = topArea(counts);
+    // 絞り込みや検索の結果から、そのフォルダーへ移る（絞り込みと検索は終える）
+    const goTo = (id) => { state.selectedTags = []; closeSearch(); state.currentId = id; render(); };
+    if (state.mode === 'check') return checkView(top, goTo);
 
     const chipHandlers = {
         onPlus: (id) => bump(id, 1),
@@ -520,6 +608,43 @@ function browserView() {
             h('p', { class: 'text-xs text-muted' }, 'タップで個数が +1（アイコンを除く）、－ボタンで -1。長押しで編集。'),
             switchOnPc ? viewSwitch() : h('div', { class: 'sm:hidden' }, viewSwitch()))
         : null);
+
+    if (searching()) {
+        // 名前の検索結果：フォルダーごとのまとまりを上から順に。個数の＋－はそのまま使える。
+        // タグを選んでいないときは、探す範囲を変えられるようにパンくずを出す
+        const groups = findGroups();
+        let crumbRoot = null;
+        if (state.selectedTags.length === 0) {
+            crumbRoot = h('div', { class: 'mb-3' });
+            renderBreadcrumb(crumbRoot, {
+                folders: state.folders,
+                currentId: state.currentId,
+                onNavigate: (id) => { state.currentId = id; render(); },
+            });
+        }
+        const wholeFolders = groups.filter((g) => g.whole).map((g) => g.folder);
+        const memoToggle = memoToggleFor(wholeFolders);
+        const memoRow = memoToggle ? h('div', { class: 'flex justify-end mb-2' }, memoToggle) : null;
+        const hasChips = groups.some((g) => !g.whole);
+        const list = h('div', { class: 'grid gap-2' }, groups.map((g) => {
+            if (g.whole) {
+                const row = h('div');
+                renderFolderList(row, {
+                    folders: [g.folder],
+                    onOpen: goTo,
+                    onEdit: editFolder,
+                    subtitle: (f) => pathLabel(state.folders, f.parentId),
+                    showMemo: state.showFolderMemos,
+                });
+                return row;
+            }
+            const chipsRoot = h('div', { class: 'grid gap-2' });
+            renderChipList(chipsRoot, { chips: g.chips, view: state.chipView, ...chipHandlers });
+            return h('div', { class: 'grid gap-2' }, groupHeading(g.folder, goTo), chipsRoot);
+        }));
+        const none = groups.length === 0 ? h('p', { class: 'text-center text-muted py-12' }, noSearchResults()) : null;
+        return page(top, [crumbRoot, memoRow, chipHint(hasChips), list, none]);
+    }
 
     if (state.selectedTags.length > 0) {
         // 絞り込み結果（階層をまたぐ）。パンくずは出さない
@@ -543,7 +668,7 @@ function browserView() {
         const none = result.folders.length === 0 && result.chips.length === 0
             ? h('p', { class: 'text-center text-muted py-12' }, '該当するものはありません')
             : null;
-        return h('main', { class: 'max-w-3xl mx-auto p-4 pb-28' }, filterRoot, memoRow, folderRoot, chipHint(result.chips.length > 0), chipRoot, none);
+        return page(top, [memoRow, folderRoot, chipHint(result.chips.length > 0), chipRoot, none]);
     }
 
     const subFolders = getChildFolders(state.folders, state.currentId);
@@ -574,7 +699,8 @@ function browserView() {
             ? { onUp: (id) => moveItem('chip', id, -1), onDown: (id) => moveItem('chip', id, 1), onMoveTo: (id, to) => moveItemTo('chip', id, to) }
             : null,
     });
-    const canReorder = subFolders.length > 1 || chips.length > 1;
+    // 検索欄を開いている間は、並び替えを出さない
+    const canReorder = !state.searchOpen && (subFolders.length > 1 || chips.length > 1);
     const showReorder = canReorder || reordering;
     const showSwitch = chips.length > 0 && !reordering;
     // メモの出す/隠すは、並び替え中は出さない（並び替えの行にはメモを出さないため）
@@ -601,7 +727,32 @@ function browserView() {
             state.currentId === null ? '最初のフォルダーを作りましょう' : 'このフォルダーはまだ空です')
         : null;
 
-    return h('main', { class: 'max-w-3xl mx-auto p-4 pb-28' }, filterRoot, crumbRoot, reorderToggle, folderRoot, chipHint(showSwitch, { switchOnPc: false }), chipRoot, empty);
+    return page(top, [crumbRoot, reorderToggle, folderRoot, chipHint(showSwitch, { switchOnPc: false }), chipRoot, empty]);
+}
+
+// 検索の文字を打つたびに、検索欄はそのままで、その下（data-body）だけを描き直す。
+// 検索欄ごと描き直すと、スマホのキーボードや日本語の変換が途切れるため
+function refreshBody() {
+    const old = app.querySelector('[data-body]');
+    const fresh = old ? browserView().querySelector('[data-body]') : null;
+    if (!fresh) {
+        render();
+        return;
+    }
+    old.replaceWith(fresh);
+    window.lucide?.createIcons();
+    restoreOpenMenu();
+}
+
+// 日本語の変換中に、ほかの理由（別の端末での変更など）で全体を描き直すと変換が消えるため、変換が終わるまで待つ
+let composing = false;
+let renderWaiting = false;
+function setComposing(on) {
+    composing = on;
+    if (!on && renderWaiting) {
+        renderWaiting = false;
+        render();
+    }
 }
 
 // 画面の数字は、Firestoreのローカルスナップショットが先に更新し、失敗時は自動で元に戻る
@@ -615,6 +766,10 @@ async function bump(chipId, delta) {
 }
 
 function render() {
+    if (composing && state.user) {
+        renderWaiting = true;
+        return;
+    }
     if (!state.user) {
         app.replaceChildren(loginView());
     } else if (state.loadError && (!state.loaded.folders || !state.loaded.chips)) {
@@ -634,8 +789,8 @@ function render() {
         const selection = focusKey && typeof active.selectionStart === 'number'
             ? [active.selectionStart, active.selectionEnd]
             : null;
-        // 右下の＋（追加）は、編集モードで、絞り込みも並び替えもしていないときだけ出す
-        const showFab = state.mode === 'edit' && state.selectedTags.length === 0 && !state.reorderIn;
+        // 右下の＋（追加）は、編集モードで、絞り込みも検索も並び替えもしていないときだけ出す
+        const showFab = state.mode === 'edit' && state.selectedTags.length === 0 && !state.reorderIn && !state.searchOpen;
         app.replaceChildren(headerView(), browserView(), ...(showFab ? [fabView()] : []));
         if (tagManager && tagManager.isOpen()) tagManager.refresh();
         if (focusKey) {

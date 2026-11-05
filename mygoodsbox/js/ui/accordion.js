@@ -76,3 +76,12 @@ export function renderAccordion(root, p) {
             p.folderSubtitle ? pathLink(p.folderSubtitle(f), () => p.onFolderSubtitleClick(f)) : null)),
     );
 }
+
+// 名前の検索結果（searchGroups の結果）。フォルダーごとのまとまりを上から順に出す。
+// フォルダー自身が当たったまとまりは見出し（開くと中身を全部）、チップが当たったまとまりは経路の見出し＋当たったチップ。
+// p: renderAccordion と同じもの（topChips / topFolders の代わりに groups）＋ groupHeading(folder) => Node
+export function renderSearchAccordion(root, p) {
+    root.replaceChildren(...p.groups.map((g) => (g.whole
+        ? folderNode(g.folder, 0, p, pathLink(p.folderSubtitle(g.folder), () => p.onFolderSubtitleClick(g.folder)))
+        : h('div', { class: 'grid gap-2' }, p.groupHeading(g.folder), chipBlock(g.chips, p)))));
+}
