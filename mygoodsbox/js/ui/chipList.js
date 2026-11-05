@@ -24,8 +24,8 @@ function subtitleView(c, subtitle, onSubtitleClick) {
     }, subtitle(c));
 }
 
-// 長押しで編集。onTap があれば、長押しでなかったときのタップで呼ぶ
-function longPressAttrs(c, onEdit, onTap) {
+// 長押しで編集。onTap があれば、長押しでなかったときのタップで呼ぶ（c は id を持つ項目。アコーディオンの見出しでも使う）
+export function longPressAttrs(c, onEdit, onTap) {
     let timer = null;
     let longPressed = false;
     const cancel = () => clearTimeout(timer);
