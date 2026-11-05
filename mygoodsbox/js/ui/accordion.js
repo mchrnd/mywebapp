@@ -35,7 +35,9 @@ function header(folder, isOpen, p, subtitle) {
 
 function chipBlock(chips, p, extra = {}) {
     const root = h('div');
-    renderChipList(root, { chips, view: p.view, readOnly: true, showNames: p.showNames, onEdit: p.onEditChip, ...extra });
+    renderChipList(root, {
+        chips, view: p.view, readOnly: true, showNames: p.showNames, showTags: p.showTags !== false, onEdit: p.onEditChip, ...extra,
+    });
     return root;
 }
 
@@ -59,7 +61,7 @@ function folderNode(folder, depth, p, subtitle = null, ancestors = new Set()) {
                 : null));
 }
 
-// p: { folders, chips, topChips, topFolders, open: Set, view, showNames, onToggle, onEditFolder, onEditChip,
+// p: { folders, chips, topChips, topFolders, open: Set, view, showNames, showTags, onToggle, onEditFolder, onEditChip,
 //      folderSubtitle?, onFolderSubtitleClick?, chipSubtitle?, onChipSubtitleClick? }
 // 一番上の項目（topChips が先、topFolders が後）にだけ、経路（絞り込み結果）を出せる
 export function renderAccordion(root, p) {

@@ -90,7 +90,7 @@ function rowView(c, p) {
         h('div', { class: 'min-w-0' },
             h('div', { class: 'font-medium truncate' }, c.name),
             subtitle ? subtitleView(c, subtitle, onSubtitleClick) : null,
-            tagPills(c.tags)),
+            p.showTags ? tagPills(c.tags) : null),
         h('div', { class: 'text-lg font-bold text-primary shrink-0' }, `×${c.count}`)),
         readOnly ? null : minusButton(c, onMinus, 'w-11 h-11 shrink-0'),
         readOnly ? null : pencilButton(c, onEdit, 'flex w-11 h-11 shrink-0'));
@@ -109,7 +109,7 @@ function cardView(c, p) {
         },
         h('div', { class: 'min-w-0 font-medium truncate' }, c.name),
         subtitle ? subtitleView(c, subtitle, onSubtitleClick) : null,
-        tagPills(c.tags, { wrap: false }),
+        p.showTags ? tagPills(c.tags, { wrap: false }) : null,
         // 個数の行は、カードの高さがそろっても、いつも下（－ボタンの横）に置く
         h('div', { class: `mt-auto pt-1 ${readOnly ? '' : 'pr-10'} text-lg font-bold text-primary` }, `×${c.count}`)),
         readOnly ? null : minusButton(c, onMinus, 'absolute bottom-0.5 right-0.5 w-10 h-10'),
@@ -140,9 +140,11 @@ function tileView(c, p) {
 
 // view: 'list' | 'columns' | 'grid'。並び替えモードの間は、どの並べ方でも1列にする。
 // readOnly: 確認モード（＋－・鉛筆なし、タップは何もしない、長押しで編集）。
-// showNames: false は、readOnly の升目でだけ名前を隠す（編集モードでは、＋1 を押す名前の行が要るので効かせない）
+// showNames: false は、readOnly の升目でだけ名前を隠す（編集モードでは、＋1 を押す名前の行が要るので効かせない）。
+// showTags: false は、readOnly の1列・2段組でだけタグを隠す（升目にはもともとタグを出さない）
 export function renderChipList(root, {
-    chips, view = 'list', onPlus, onMinus, onEdit, subtitle, onSubtitleClick, reorder, readOnly = false, showNames = true,
+    chips, view = 'list', onPlus, onMinus, onEdit, subtitle, onSubtitleClick, reorder,
+    readOnly = false, showNames = true, showTags = true,
 }) {
     if (reorder) {
         root.className = LAYOUT.list;
@@ -161,7 +163,11 @@ export function renderChipList(root, {
     }
     const layout = LAYOUT[view] ? view : 'list';
     root.className = LAYOUT[layout];
-    const props = { onPlus, onMinus, onEdit, subtitle, onSubtitleClick, readOnly, showNames: showNames || !readOnly };
+    const props = {
+        onPlus, onMinus, onEdit, subtitle, onSubtitleClick, readOnly,
+        showNames: showNames || !readOnly,
+        showTags: showTags || !readOnly,
+    };
     const renderOne = { list: rowView, columns: cardView, grid: tileView }[layout];
     root.replaceChildren(...chips.map((c) => renderOne(c, props)));
 }

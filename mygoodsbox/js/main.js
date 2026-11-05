@@ -7,7 +7,7 @@ import {
     tagCounts, filterByTags, pathLabel, renameTagUpdates, removeTagUpdates, moveWithinSiblings, moveToIndex,
     buildChipPatch, buildFolderPatch, parseChipView, backStep, descendantFolderIds,
 } from './tree.js';
-import { chipViewSwitch, chipNamesToggle } from './ui/chipViewSwitch.js';
+import { chipViewSwitch, chipNamesToggle, chipTagsToggle } from './ui/chipViewSwitch.js';
 import { renderAccordion } from './ui/accordion.js';
 import { openFolderSheet } from './ui/folderSheet.js';
 import { openChipSheet } from './ui/chipSheet.js';
@@ -26,6 +26,7 @@ import { openBulkChipSheet } from './ui/bulkChipSheet.js';
 const app = document.getElementById('app');
 const CHIP_VIEW_KEY = 'mygoodsbox.chipView'; // state より前に置く（state の初期化で読む）
 const CHIP_NAMES_KEY = 'mygoodsbox.chipNames'; // 確認モードの升目で名前を出すか（'0' なら隠す）
+const CHIP_TAGS_KEY = 'mygoodsbox.chipTags'; // 確認モードの1列・2段組でタグを出すか（'0' なら隠す）
 
 const state = {
     user: null,
@@ -44,24 +45,33 @@ const state = {
     chipView: loadChipView(),
     mode: 'edit', // 'edit'（編集モード）| 'check'（確認モード）。アプリを開いたときは、いつも編集モード
     openFolders: new Set(), // 確認モードのアコーディオンで開いているフォルダーのID（保存しない）
-    showChipNames: loadChipNames(),
+    showChipNames: loadShown(CHIP_NAMES_KEY),
+    showChipTags: loadShown(CHIP_TAGS_KEY),
 };
 
-// 確認モードの升目で、チップの名前を出すか。端末ごとに覚える
-function loadChipNames() {
+// 確認モードの表示の出す/隠す（升目の名前、1列・2段組のタグ）。端末ごとに覚える。読めないときは出す
+function loadShown(key) {
     try {
-        return localStorage.getItem(CHIP_NAMES_KEY) !== '0';
+        return localStorage.getItem(key) !== '0';
     } catch {
         return true;
     }
 }
-function setChipNames(shown) {
-    state.showChipNames = shown;
+function saveShown(key, shown) {
     try {
-        localStorage.setItem(CHIP_NAMES_KEY, shown ? '1' : '0');
+        localStorage.setItem(key, shown ? '1' : '0');
     } catch {
         // 保存できなくても、表示は切り替える
     }
+}
+function setChipNames(shown) {
+    state.showChipNames = shown;
+    saveShown(CHIP_NAMES_KEY, shown);
+    render();
+}
+function setChipTags(shown) {
+    state.showChipTags = shown;
+    saveShown(CHIP_TAGS_KEY, shown);
     render();
 }
 
@@ -404,7 +414,9 @@ function checkView(filterRoot, goTo) {
             scopeIds.length > 0 ? smallButton('すべて開く', 'chevrons-up-down', () => setOpen(scopeIds, true)) : null,
             scopeIds.length > 0 ? smallButton('すべて閉じる', 'chevrons-down-up', () => setOpen(scopeIds, false)) : null),
         h('div', { class: 'flex items-center gap-2 ml-auto' },
-            state.chipView === 'grid' ? chipNamesToggle({ shown: state.showChipNames, onChange: setChipNames }) : null,
+            state.chipView === 'grid'
+                ? chipNamesToggle({ shown: state.showChipNames, onChange: setChipNames })
+                : chipTagsToggle({ shown: state.showChipTags, onChange: setChipTags }),
             chipViewSwitch({ view: state.chipView, onChange: setChipView })));
 
     let crumbRoot = null;
@@ -426,6 +438,7 @@ function checkView(filterRoot, goTo) {
         open: state.openFolders,
         view: state.chipView,
         showNames: state.showChipNames,
+        showTags: state.showChipTags,
         onToggle: (id) => setOpen([id], !state.openFolders.has(id)),
         onEditFolder: editFolder,
         onEditChip: editChip,

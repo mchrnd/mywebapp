@@ -7,17 +7,27 @@ const VIEW_INFO = {
     grid: { icon: 'layout-grid', label: '升目で表示' },
 };
 
-// 確認モードの升目で、チップの名前を出すか隠すかの切り替え（目のアイコン）
-export function chipNamesToggle({ shown, onChange }) {
+// 確認モードの表示の切り替えボタン（出している＝白、隠している＝青で塗る）
+function showHideToggle({ shown, onChange, label, iconShown, iconHidden, what }) {
     return h('button', {
         type: 'button',
         class: `w-9 h-9 shrink-0 flex items-center justify-center rounded-lg border ${shown ? 'border-border bg-surface text-muted' : 'border-primary bg-primary text-white'}`,
-        'aria-label': 'チップの名前を表示',
+        'aria-label': label,
         'aria-pressed': shown ? 'true' : 'false',
-        title: shown ? '名前を隠す' : '名前を出す',
+        title: shown ? `${what}を隠す` : `${what}を出す`,
         onClick: () => onChange(!shown),
-    }, icon(shown ? 'eye' : 'eye-off', 'w-4 h-4'));
+    }, icon(shown ? iconShown : iconHidden, 'w-4 h-4'));
 }
+
+// 確認モードの升目で、チップの名前を出すか隠すかの切り替え（目のアイコン）
+export const chipNamesToggle = ({ shown, onChange }) => showHideToggle({
+    shown, onChange, label: 'チップの名前を表示', iconShown: 'eye', iconHidden: 'eye-off', what: '名前',
+});
+
+// 確認モードの1列・2段組で、チップのタグを出すか隠すかの切り替え（タグのアイコン）
+export const chipTagsToggle = ({ shown, onChange }) => showHideToggle({
+    shown, onChange, label: 'チップのタグを表示', iconShown: 'tag', iconHidden: 'tag', what: 'タグ',
+});
 
 // チップの並べ方を切り替えるボタン（1列・2段組・升目）
 export function chipViewSwitch({ view, onChange }) {

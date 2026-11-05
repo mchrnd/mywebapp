@@ -34,36 +34,36 @@
     <script src="https://unpkg.com/lucide@1.67.0/dist/umd/lucide.min.js" integrity="sha384-xrRF3kGz5GMZeUudxpTxrrjy0NRy/+U3dHY72SdMEgy9OsrO9x8mCw6DCD8m+jjS" crossorigin="anonymous"></script>
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css?v=19">
+    <link rel="stylesheet" href="css/style.css?v=20">
     <!-- 更新の公開後に新旧のファイルが混ざらないよう、すべてのモジュールに main.js と同じキャッシュ番号を付ける。
          番号を上げるときは、このファイルの ?v= をすべて同じ値にそろえる（tests/site.test.js で確認） -->
     <script type="importmap">
     {
         "imports": {
-            "./js/firebase.js": "./js/firebase.js?v=19",
-            "./js/ui/accordion.js": "./js/ui/accordion.js?v=19",
-            "./js/image.js": "./js/image.js?v=19",
-            "./js/tree.js": "./js/tree.js?v=19",
-            "./js/ui/breadcrumb.js": "./js/ui/breadcrumb.js?v=19",
-            "./js/ui/bulkChipSheet.js": "./js/ui/bulkChipSheet.js?v=19",
-            "./js/ui/chipList.js": "./js/ui/chipList.js?v=19",
-            "./js/ui/chipSheet.js": "./js/ui/chipSheet.js?v=19",
-            "./js/ui/chipViewSwitch.js": "./js/ui/chipViewSwitch.js?v=19",
-            "./js/ui/confirm.js": "./js/ui/confirm.js?v=19",
-            "./js/ui/dom.js": "./js/ui/dom.js?v=19",
-            "./js/ui/dragReorder.js": "./js/ui/dragReorder.js?v=19",
-            "./js/ui/folderList.js": "./js/ui/folderList.js?v=19",
-            "./js/ui/folderSheet.js": "./js/ui/folderSheet.js?v=19",
-            "./js/ui/help.js": "./js/ui/help.js?v=19",
-            "./js/ui/iconPicker.js": "./js/ui/iconPicker.js?v=19",
-            "./js/ui/icons.js": "./js/ui/icons.js?v=19",
-            "./js/ui/imageCropper.js": "./js/ui/imageCropper.js?v=19",
-            "./js/ui/reorderButtons.js": "./js/ui/reorderButtons.js?v=19",
-            "./js/ui/sheet.js": "./js/ui/sheet.js?v=19",
-            "./js/ui/tagFilter.js": "./js/ui/tagFilter.js?v=19",
-            "./js/ui/tagInput.js": "./js/ui/tagInput.js?v=19",
-            "./js/ui/tagManager.js": "./js/ui/tagManager.js?v=19",
-            "./js/ui/toast.js": "./js/ui/toast.js?v=19"
+            "./js/firebase.js": "./js/firebase.js?v=20",
+            "./js/ui/accordion.js": "./js/ui/accordion.js?v=20",
+            "./js/image.js": "./js/image.js?v=20",
+            "./js/tree.js": "./js/tree.js?v=20",
+            "./js/ui/breadcrumb.js": "./js/ui/breadcrumb.js?v=20",
+            "./js/ui/bulkChipSheet.js": "./js/ui/bulkChipSheet.js?v=20",
+            "./js/ui/chipList.js": "./js/ui/chipList.js?v=20",
+            "./js/ui/chipSheet.js": "./js/ui/chipSheet.js?v=20",
+            "./js/ui/chipViewSwitch.js": "./js/ui/chipViewSwitch.js?v=20",
+            "./js/ui/confirm.js": "./js/ui/confirm.js?v=20",
+            "./js/ui/dom.js": "./js/ui/dom.js?v=20",
+            "./js/ui/dragReorder.js": "./js/ui/dragReorder.js?v=20",
+            "./js/ui/folderList.js": "./js/ui/folderList.js?v=20",
+            "./js/ui/folderSheet.js": "./js/ui/folderSheet.js?v=20",
+            "./js/ui/help.js": "./js/ui/help.js?v=20",
+            "./js/ui/iconPicker.js": "./js/ui/iconPicker.js?v=20",
+            "./js/ui/icons.js": "./js/ui/icons.js?v=20",
+            "./js/ui/imageCropper.js": "./js/ui/imageCropper.js?v=20",
+            "./js/ui/reorderButtons.js": "./js/ui/reorderButtons.js?v=20",
+            "./js/ui/sheet.js": "./js/ui/sheet.js?v=20",
+            "./js/ui/tagFilter.js": "./js/ui/tagFilter.js?v=20",
+            "./js/ui/tagInput.js": "./js/ui/tagInput.js?v=20",
+            "./js/ui/tagManager.js": "./js/ui/tagManager.js?v=20",
+            "./js/ui/toast.js": "./js/ui/toast.js?v=20"
         }
     }
     </script>
@@ -71,7 +71,7 @@
 <body class="bg-bg text-text min-h-screen antialiased">
     <div id="app"></div>
     <div id="toast" class="fixed left-1/2 -translate-x-1/2 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-50 pointer-events-none"></div>
-    <script type="module" src="js/main.js?v=19"></script>
+    <script type="module" src="js/main.js?v=20"></script>
     <script>
         // 電波がないときに案内の画面を出すための Service Worker（サイトの一番上の sw.js。範囲はサイト全体）
         if ('serviceWorker' in navigator) {
