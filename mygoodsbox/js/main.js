@@ -10,7 +10,7 @@ import {
 } from './tree.js';
 import { chipViewSwitch, chipNamesToggle, chipTagsToggle, folderMemosToggle } from './ui/chipViewSwitch.js';
 import { renderAccordion, renderSearchAccordion } from './ui/accordion.js';
-import { searchOpenButton, searchPanel, SEARCH_FOCUS_KEY } from './ui/searchBar.js';
+import { searchOpenButton, searchPanel, searchQueryChip, SEARCH_FOCUS_KEY } from './ui/searchBar.js';
 import { openFolderSheet } from './ui/folderSheet.js';
 import { openChipSheet } from './ui/chipSheet.js';
 import { confirmDialog } from './ui/confirm.js';
@@ -52,8 +52,9 @@ const state = {
     showChipNames: loadShown(CHIP_NAMES_KEY),
     showChipTags: loadShown(CHIP_TAGS_KEY),
     showFolderMemos: loadShown(FOLDER_MEMOS_KEY),
-    searchOpen: false, // 名前の検索欄を開いているか
-    searchQuery: '',
+    searchOpen: false, // 名前の検索欄を開いているか（閉じても絞り込みは残る）
+    searchDraft: '', // 検索欄に打っている途中の文字
+    searchQuery: '', // 「検索」で決めた、絞り込みに使っている言葉（空なら絞り込みなし）
     searchTargets: loadSearchTargets(),
 };
 
@@ -73,19 +74,35 @@ function toggleTarget(key) {
     }
     render();
 }
-// 検索欄を開く（並び替えは終える）／閉じる（検索の文字も消す）
+// 検索欄を開く（今絞り込んでいる言葉を入れて出す）。閉じても絞り込みは残す
 function openSearch() {
     state.searchOpen = true;
-    state.reorderIn = null;
+    state.searchDraft = state.searchQuery;
     state.fabOpen = false;
     render();
     app.querySelector(`[data-focus-key="${SEARCH_FOCUS_KEY}"]`)?.focus();
 }
-function closeSearch() {
-    state.searchOpen = false;
-    state.searchQuery = '';
+// 「検索」：打った言葉で絞り込む（空なら解く）。絞り込むときは並び替えを終える
+function submitSearch() {
+    state.searchQuery = state.searchDraft.trim();
+    if (state.searchQuery) {
+        state.reorderIn = null;
+        state.fabOpen = false;
+    }
+    render();
+    document.activeElement?.blur(); // キーボードを閉じて、結果を見やすくする
 }
-const searching = () => state.searchOpen && state.searchQuery.trim() !== '';
+// 絞り込みを解く（検索欄の開け閉めはそのまま）
+function clearSearchQuery() {
+    state.searchQuery = '';
+    state.searchDraft = '';
+}
+// 検索を終える（絞り込みを解いて、検索欄も閉じる）。結果から別のフォルダーへ移るときなど
+function endSearch() {
+    clearSearchQuery();
+    state.searchOpen = false;
+}
+const searching = () => state.searchQuery !== '';
 
 // 確認モードの表示の出す/隠す（升目の名前、1列・2段組のタグ）。端末ごとに覚える。読めないときは出す
 function loadShown(key) {
@@ -349,7 +366,7 @@ function stopSubscription() {
     state.loadError = false;
     state.mode = 'edit';
     state.openFolders = new Set();
-    closeSearch();
+    endSearch();
 }
 
 function loginView() {
@@ -371,7 +388,7 @@ function goHome() {
     state.reorderIn = null;
     state.menuOpen = false;
     state.fabOpen = false;
-    closeSearch();
+    endSearch();
     render();
     window.scrollTo(0, 0);
 }
@@ -518,7 +535,7 @@ function checkView(top, goTo) {
     return page(top, [crumbRoot, empty ? null : toolbar, hint, accordionRoot, empty]);
 }
 
-// 画面の本体。検索欄より下（data-body）は、検索の文字を打つたびにここだけ描き直す（refreshBody）
+// 画面の本体。上（検索欄とタグの列）と、その下（data-body）に分ける
 const page = (top, rest) => h('main', { class: 'max-w-3xl mx-auto p-4 pb-28' }, top, h('div', { 'data-body': true }, rest));
 
 const findGroups = () => searchGroups(state.folders, state.chips, {
@@ -560,18 +577,28 @@ function topArea(counts) {
         h('div', { class: 'flex items-start gap-2' },
             searchOpenButton({
                 open: state.searchOpen,
-                onClick: () => { if (state.searchOpen) { closeSearch(); render(); } else openSearch(); },
+                // 閉じても絞り込みは残す（画面をすっきりさせたいだけのときのため）
+                onClick: () => { if (state.searchOpen) { state.searchOpen = false; render(); } else openSearch(); },
             }),
+            searching()
+                ? searchQueryChip({
+                    query: state.searchQuery,
+                    onOpen: () => { if (!state.searchOpen) openSearch(); },
+                    onClear: () => { clearSearchQuery(); render(); },
+                })
+                : null,
             tagRoot),
         state.searchOpen
             ? searchPanel({
-                query: state.searchQuery,
-                onQuery: (text) => { state.searchQuery = text; refreshBody(); },
+                draft: state.searchDraft,
+                onDraft: (text) => { state.searchDraft = text; },
+                onSubmit: submitSearch,
+                // 欄の × などで空にしたら、すぐに絞り込みを解く
+                onEmptied: () => { if (searching()) { clearSearchQuery(); render(); } },
                 onComposing: setComposing,
                 targets: state.searchTargets,
                 onToggleTarget: toggleTarget,
                 scopeLabel,
-                onClose: () => { closeSearch(); render(); },
             })
             : null);
 }
@@ -587,7 +614,7 @@ function browserView() {
 
     const top = topArea(counts);
     // 絞り込みや検索の結果から、そのフォルダーへ移る（絞り込みと検索は終える）
-    const goTo = (id) => { state.selectedTags = []; closeSearch(); state.currentId = id; render(); };
+    const goTo = (id) => { state.selectedTags = []; endSearch(); state.currentId = id; render(); };
     if (state.mode === 'check') return checkView(top, goTo);
 
     const chipHandlers = {
@@ -699,8 +726,7 @@ function browserView() {
             ? { onUp: (id) => moveItem('chip', id, -1), onDown: (id) => moveItem('chip', id, 1), onMoveTo: (id, to) => moveItemTo('chip', id, to) }
             : null,
     });
-    // 検索欄を開いている間は、並び替えを出さない
-    const canReorder = !state.searchOpen && (subFolders.length > 1 || chips.length > 1);
+    const canReorder = subFolders.length > 1 || chips.length > 1;
     const showReorder = canReorder || reordering;
     const showSwitch = chips.length > 0 && !reordering;
     // メモの出す/隠すは、並び替え中は出さない（並び替えの行にはメモを出さないため）
@@ -728,20 +754,6 @@ function browserView() {
         : null;
 
     return page(top, [crumbRoot, reorderToggle, folderRoot, chipHint(showSwitch, { switchOnPc: false }), chipRoot, empty]);
-}
-
-// 検索の文字を打つたびに、検索欄はそのままで、その下（data-body）だけを描き直す。
-// 検索欄ごと描き直すと、スマホのキーボードや日本語の変換が途切れるため
-function refreshBody() {
-    const old = app.querySelector('[data-body]');
-    const fresh = old ? browserView().querySelector('[data-body]') : null;
-    if (!fresh) {
-        render();
-        return;
-    }
-    old.replaceWith(fresh);
-    window.lucide?.createIcons();
-    restoreOpenMenu();
 }
 
 // 日本語の変換中に、ほかの理由（別の端末での変更など）で全体を描き直すと変換が消えるため、変換が終わるまで待つ
@@ -790,7 +802,7 @@ function render() {
             ? [active.selectionStart, active.selectionEnd]
             : null;
         // 右下の＋（追加）は、編集モードで、絞り込みも検索も並び替えもしていないときだけ出す
-        const showFab = state.mode === 'edit' && state.selectedTags.length === 0 && !state.reorderIn && !state.searchOpen;
+        const showFab = state.mode === 'edit' && state.selectedTags.length === 0 && !state.reorderIn && !searching();
         app.replaceChildren(headerView(), browserView(), ...(showFab ? [fabView()] : []));
         if (tagManager && tagManager.isOpen()) tagManager.refresh();
         if (focusKey) {
