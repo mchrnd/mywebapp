@@ -4,7 +4,7 @@ import {
     normalizeTag, normalizeTags, getChildFolders, getChipsIn, getBreadcrumb, getSiblings,
     pathLabel, collectDescendants, wouldCreateCycle, allTags, filterByTags,
     chipNameSuggestions, tagSuggestions, chunkIds, parseCount, tagCounts, visibleFilterTags, renameTagUpdates, removeTagUpdates, moveWithinSiblings, moveToIndex, parseChipNames, splitNewNames, buildChipPatch, buildFolderPatch,
-    initialOf, parseChipView, CHIP_VIEWS, backStep,
+    initialOf, parseChipView, CHIP_VIEWS, backStep, descendantFolderIds,
 } from '../mygoodsbox/js/tree.js';
 
 const f = (id, name, parentId, tags = []) => ({ id, name, parentId, tags, icon: null, createdAt: 0 });
@@ -323,6 +323,26 @@ test('backStep exits reorder mode first, then climbs one folder, and stops at ho
     assert.deepEqual(backStep(folders, { currentId: 'gone', reordering: false }), { reordering: false, currentId: null });
     // ホームで何もないときは、アプリの中では戻れない（ブラウザの戻るに任せる）
     assert.equal(backStep(folders, { currentId: null, reordering: false }), null);
+});
+
+test('descendantFolderIds lists every folder below a parent and stops on cycles', () => {
+    const folders = [f('A', 'A', null), f('B', 'B', 'A'), f('C', 'C', 'B'), f('D', 'D', null)];
+    assert.deepEqual(descendantFolderIds(folders, 'A').sort(), ['B', 'C']);
+    assert.deepEqual(descendantFolderIds(folders, null).sort(), ['A', 'B', 'C', 'D']);
+    assert.deepEqual(descendantFolderIds(folders, 'C'), []);
+    // 親子が輪になったフォルダー（ホームまで届かない）があっても止まり、ホームからは出てこない
+    const looped = [...folders, f('X', 'X', 'Y'), f('Y', 'Y', 'X')];
+    assert.deepEqual(descendantFolderIds(looped, null).sort(), ['A', 'B', 'C', 'D']);
+    assert.ok(!descendantFolderIds(looped, 'X').includes('X'));
+});
+
+test('descendantFolderIds stays fast with thousands of folders', () => {
+    const many = [f('root', 'root', null)];
+    for (let i = 0; i < 4000; i++) many.push(f(`n${i}`, `n${i}`, i % 2 ? 'root' : `n${i - 1 >= 0 ? i - 1 : 0}`));
+    const start = performance.now();
+    descendantFolderIds(many, null);
+    const ms = performance.now() - start;
+    assert.ok(ms < 300, `took ${ms.toFixed(0)}ms`);
 });
 
 test('tag helpers stay fast with thousands of folders', () => {

@@ -42,6 +42,28 @@ export function getChildFolders(folders, parentId) {
         .sort(byOrder);
 }
 
+// parentId より下にある全フォルダーのID（parentId 自身は含まない。null ならホームから全部）。
+// 確認モードの「すべて開く」に使う。親子の表を一度だけ作って幅優先でたどり、輪になっていても止まる
+export function descendantFolderIds(folders, parentId) {
+    const children = new Map();
+    for (const f of folders) {
+        if (!children.has(f.parentId)) children.set(f.parentId, []);
+        children.get(f.parentId).push(f.id);
+    }
+    const seen = new Set(parentId === null ? [] : [parentId]);
+    const result = [];
+    const queue = [parentId];
+    for (let i = 0; i < queue.length; i++) {
+        for (const id of children.get(queue[i]) || []) {
+            if (seen.has(id)) continue;
+            seen.add(id);
+            result.push(id);
+            queue.push(id);
+        }
+    }
+    return result;
+}
+
 export function getChipsIn(chips, folderId) {
     if (folderId === null) return [];
     return chips.filter((c) => c.folderId === folderId).sort(byOrder);
