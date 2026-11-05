@@ -24,6 +24,11 @@ export const chipNamesToggle = ({ shown, onChange }) => showHideToggle({
     shown, onChange, label: 'チップの名前を表示', iconShown: 'eye', iconHidden: 'eye-off', what: '名前',
 });
 
+// フォルダーのメモを出すか隠すかの切り替え（メモのアイコン）。編集モードと確認モードで共通
+export const folderMemosToggle = ({ shown, onChange }) => showHideToggle({
+    shown, onChange, label: 'フォルダーのメモを表示', iconShown: 'sticky-note', iconHidden: 'sticky-note', what: 'メモ',
+});
+
 // 確認モードの1列・2段組で、チップのタグを出すか隠すかの切り替え（タグのアイコン）
 export const chipTagsToggle = ({ shown, onChange }) => showHideToggle({
     shown, onChange, label: 'チップのタグを表示', iconShown: 'tag', iconHidden: 'tag', what: 'タグ',

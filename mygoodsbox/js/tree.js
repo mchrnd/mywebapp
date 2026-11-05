@@ -349,6 +349,16 @@ export function parseChipView(value) {
     return CHIP_VIEWS.includes(value) ? value : 'list';
 }
 
+// フォルダーのメモ（定価や販売時期など）。1行・60文字まで
+export const MEMO_MAX = 60;
+
+// メモを整える：改行やタブを含む空白のまとまりを空白1つにし（全角スペースは入力どおり残す）、
+// 前後を取り、60文字（絵文字なども1文字）までにする
+export function normalizeMemo(text) {
+    const line = String(text ?? '').replace(/[^\S　]+/g, ' ').trim();
+    return [...new Intl.Segmenter('ja').segment(line)].slice(0, MEMO_MAX).map((s) => s.segment).join('');
+}
+
 // フォルダーの編集内容。変わった項目だけを返す。別の親へ移動したときは、元の並び順を消す（clearOrder）
 export function buildFolderPatch(original, edited) {
     const patch = {};
@@ -356,6 +366,7 @@ export function buildFolderPatch(original, edited) {
     if (edited.parentId !== original.parentId) patch.parentId = edited.parentId;
     if (!sameTags(edited.tags, original.tags)) patch.tags = edited.tags;
     if (!sameIcon(edited.icon, original.icon)) patch.icon = edited.icon;
+    if ('memo' in edited && (edited.memo ?? '') !== (original.memo ?? '')) patch.memo = edited.memo;
     const clearOrder = 'parentId' in patch && typeof original.order === 'number';
     return { patch, clearOrder };
 }

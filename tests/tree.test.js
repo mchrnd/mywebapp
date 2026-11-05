@@ -4,7 +4,7 @@ import {
     normalizeTag, normalizeTags, getChildFolders, getChipsIn, getBreadcrumb, getSiblings,
     pathLabel, collectDescendants, wouldCreateCycle, allTags, filterByTags,
     chipNameSuggestions, tagSuggestions, chunkIds, parseCount, tagCounts, visibleFilterTags, renameTagUpdates, removeTagUpdates, moveWithinSiblings, moveToIndex, parseChipNames, splitNewNames, buildChipPatch, buildFolderPatch,
-    initialOf, parseChipView, CHIP_VIEWS, backStep, descendantFolderIds,
+    initialOf, parseChipView, CHIP_VIEWS, backStep, descendantFolderIds, normalizeMemo, MEMO_MAX,
 } from '../mygoodsbox/js/tree.js';
 
 const f = (id, name, parentId, tags = []) => ({ id, name, parentId, tags, icon: null, createdAt: 0 });
@@ -343,6 +343,28 @@ test('descendantFolderIds stays fast with thousands of folders', () => {
     descendantFolderIds(many, null);
     const ms = performance.now() - start;
     assert.ok(ms < 300, `took ${ms.toFixed(0)}ms`);
+});
+
+test('normalizeMemo keeps one trimmed line of at most 60 characters', () => {
+    assert.equal(normalizeMemo('  定価 800円  '), '定価 800円');
+    // 貼り付けた改行やタブは空白1つにまとめる
+    assert.equal(normalizeMemo('定価 800円\n\n2026年4月　発売\t予約'), '定価 800円 2026年4月　発売 予約');
+    assert.equal(normalizeMemo('あ'.repeat(70)).length, MEMO_MAX);
+    assert.equal(MEMO_MAX, 60);
+    // 絵文字などを途中で切って壊さない
+    assert.equal(normalizeMemo('🎀'.repeat(70)), '🎀'.repeat(60));
+    assert.equal(normalizeMemo(''), '');
+    assert.equal(normalizeMemo(undefined), '');
+});
+
+test('buildFolderPatch saves the memo only when it changes', () => {
+    const original = { ...f('x', 'A', null, []), memo: '定価 800円' };
+    const same = { name: 'A', parentId: null, tags: [], icon: null, memo: '定価 800円' };
+    assert.deepEqual(buildFolderPatch(original, same), { patch: {}, clearOrder: false });
+    assert.deepEqual(buildFolderPatch(original, { ...same, memo: '定価 900円' }), { patch: { memo: '定価 900円' }, clearOrder: false });
+    // メモのない古いフォルダーで、メモ欄が空のままなら保存しない
+    assert.deepEqual(buildFolderPatch(f('x', 'A', null, []), { ...same, memo: '' }), { patch: {}, clearOrder: false });
+    assert.deepEqual(buildFolderPatch(f('x', 'A', null, []), { ...same, memo: '発売 4月' }), { patch: { memo: '発売 4月' }, clearOrder: false });
 });
 
 test('tag helpers stay fast with thousands of folders', () => {

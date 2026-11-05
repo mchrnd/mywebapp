@@ -1,6 +1,7 @@
 import { h, icon } from './dom.js';
 import { renderIcon } from './icons.js';
 import { renderChipList, longPressAttrs } from './chipList.js';
+import { memoLine } from './folderList.js';
 import { getChildFolders, getChipsIn } from '../tree.js';
 
 // 確認モードのアコーディオン。フォルダーの見出しをタップで開閉、長押しで編集。
@@ -30,7 +31,8 @@ function header(folder, isOpen, p, subtitle) {
     renderIcon(folder.icon),
     h('div', { class: 'min-w-0 flex-1' },
         h('div', { class: 'font-medium truncate' }, folder.name),
-        subtitle));
+        subtitle,
+        p.showMemo ? memoLine(folder) : null));
 }
 
 function chipBlock(chips, p, extra = {}) {
@@ -61,7 +63,7 @@ function folderNode(folder, depth, p, subtitle = null, ancestors = new Set()) {
                 : null));
 }
 
-// p: { folders, chips, topChips, topFolders, open: Set, view, showNames, showTags, onToggle, onEditFolder, onEditChip,
+// p: { folders, chips, topChips, topFolders, open: Set, view, showNames, showTags, showMemo, onToggle, onEditFolder, onEditChip,
 //      folderSubtitle?, onFolderSubtitleClick?, chipSubtitle?, onChipSubtitleClick? }
 // 一番上の項目（topChips が先、topFolders が後）にだけ、経路（絞り込み結果）を出せる
 export function renderAccordion(root, p) {

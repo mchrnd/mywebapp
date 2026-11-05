@@ -3,8 +3,13 @@ import { renderIcon } from './icons.js';
 import { reorderButtons } from './reorderButtons.js';
 import { attachDragReorder } from './dragReorder.js';
 
-// subtitle: 項目ごとの補足行（タグ絞り込み結果の経路表示などに使う）
-export function renderFolderList(root, { folders, onOpen, onEdit, subtitle, reorder }) {
+// フォルダーのメモ（定価や販売時期など）。名前の下に小さく1行、入り切らない分は「…」
+export const memoLine = (folder) => (folder.memo
+    ? h('div', { class: 'text-xs text-muted truncate', 'data-memo': true }, folder.memo)
+    : null);
+
+// subtitle: 項目ごとの補足行（タグ絞り込み結果の経路表示などに使う）。showMemo: メモを出すか
+export function renderFolderList(root, { folders, onOpen, onEdit, subtitle, reorder, showMemo = true }) {
     if (reorder) {
         const rows = folders.map((f, i) => h('div', {
             class: 'drag-row no-callout flex items-center bg-surface border border-border rounded-xl shadow-sm',
@@ -29,6 +34,7 @@ export function renderFolderList(root, { folders, onOpen, onEdit, subtitle, reor
     h('div', { class: 'min-w-0' },
         h('div', { class: 'font-medium truncate' }, f.name),
         subtitle ? h('div', { class: 'text-xs text-muted truncate' }, subtitle(f)) : null,
+        showMemo ? memoLine(f) : null,
         tagPills(f.tags))),
     h('button', {
         type: 'button',

@@ -58,8 +58,8 @@ export function subscribe(uid, { onFolders, onChips, onError }) {
     };
 }
 
-export async function addFolder(uid, { name, parentId, tags, icon }) {
-    await addDoc(foldersRef(uid), { name, parentId, tags, icon, createdAt: serverTimestamp() });
+export async function addFolder(uid, { name, parentId, tags, icon, memo = '' }) {
+    await addDoc(foldersRef(uid), { name, parentId, tags, icon, memo, createdAt: serverTimestamp() });
 }
 
 // clearOrder: 別の親へ移動したときに、元の並び順（order）を消す

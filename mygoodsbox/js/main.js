@@ -7,7 +7,7 @@ import {
     tagCounts, filterByTags, pathLabel, renameTagUpdates, removeTagUpdates, moveWithinSiblings, moveToIndex,
     buildChipPatch, buildFolderPatch, parseChipView, backStep, descendantFolderIds,
 } from './tree.js';
-import { chipViewSwitch, chipNamesToggle, chipTagsToggle } from './ui/chipViewSwitch.js';
+import { chipViewSwitch, chipNamesToggle, chipTagsToggle, folderMemosToggle } from './ui/chipViewSwitch.js';
 import { renderAccordion } from './ui/accordion.js';
 import { openFolderSheet } from './ui/folderSheet.js';
 import { openChipSheet } from './ui/chipSheet.js';
@@ -27,6 +27,7 @@ const app = document.getElementById('app');
 const CHIP_VIEW_KEY = 'mygoodsbox.chipView'; // state より前に置く（state の初期化で読む）
 const CHIP_NAMES_KEY = 'mygoodsbox.chipNames'; // 確認モードの升目で名前を出すか（'0' なら隠す）
 const CHIP_TAGS_KEY = 'mygoodsbox.chipTags'; // 確認モードの1列・2段組でタグを出すか（'0' なら隠す）
+const FOLDER_MEMOS_KEY = 'mygoodsbox.folderMemos'; // フォルダーのメモを出すか（'0' なら隠す。両モード共通）
 
 const state = {
     user: null,
@@ -47,6 +48,7 @@ const state = {
     openFolders: new Set(), // 確認モードのアコーディオンで開いているフォルダーのID（保存しない）
     showChipNames: loadShown(CHIP_NAMES_KEY),
     showChipTags: loadShown(CHIP_TAGS_KEY),
+    showFolderMemos: loadShown(FOLDER_MEMOS_KEY),
 };
 
 // 確認モードの表示の出す/隠す（升目の名前、1列・2段組のタグ）。端末ごとに覚える。読めないときは出す
@@ -74,6 +76,15 @@ function setChipTags(shown) {
     saveShown(CHIP_TAGS_KEY, shown);
     render();
 }
+function setFolderMemos(shown) {
+    state.showFolderMemos = shown;
+    saveShown(FOLDER_MEMOS_KEY, shown);
+    render();
+}
+// 画面に出ているフォルダーにメモが1つでもあるときだけ、メモの出す/隠すボタンを出す
+const memoToggleFor = (folders) => (folders.some((f) => f && f.memo)
+    ? folderMemosToggle({ shown: state.showFolderMemos, onChange: setFolderMemos })
+    : null);
 
 // 編集モードと確認モードの切り替え。今いるフォルダーとタグの選択はそのまま。
 // 確認モードでは並び替えを終え、追加のメニューを閉じる
@@ -414,6 +425,8 @@ function checkView(filterRoot, goTo) {
             scopeIds.length > 0 ? smallButton('すべて開く', 'chevrons-up-down', () => setOpen(scopeIds, true)) : null,
             scopeIds.length > 0 ? smallButton('すべて閉じる', 'chevrons-down-up', () => setOpen(scopeIds, false)) : null),
         h('div', { class: 'flex items-center gap-2 ml-auto' },
+            // 開け閉めでボタンが出たり消えたりしないよう、見る範囲（閉じているフォルダーも含む）で判定する
+            memoToggleFor([...topFolders, ...scopeIds.map((id) => state.folders.find((f) => f.id === id))]),
             state.chipView === 'grid'
                 ? chipNamesToggle({ shown: state.showChipNames, onChange: setChipNames })
                 : chipTagsToggle({ shown: state.showChipTags, onChange: setChipTags }),
@@ -439,6 +452,7 @@ function checkView(filterRoot, goTo) {
         view: state.chipView,
         showNames: state.showChipNames,
         showTags: state.showChipTags,
+        showMemo: state.showFolderMemos,
         onToggle: (id) => setOpen([id], !state.openFolders.has(id)),
         onEditFolder: editFolder,
         onEditChip: editChip,
@@ -515,7 +529,10 @@ function browserView() {
             onOpen: goTo,
             onEdit: editFolder,
             subtitle: (f) => pathLabel(state.folders, f.parentId),
+            showMemo: state.showFolderMemos,
         });
+        const memoToggle = memoToggleFor(result.folders);
+        const memoRow = memoToggle ? h('div', { class: 'flex justify-end mb-2' }, memoToggle) : null;
         renderChipList(chipRoot, {
             chips: result.chips,
             view: state.chipView,
@@ -526,7 +543,7 @@ function browserView() {
         const none = result.folders.length === 0 && result.chips.length === 0
             ? h('p', { class: 'text-center text-muted py-12' }, '該当するものはありません')
             : null;
-        return h('main', { class: 'max-w-3xl mx-auto p-4 pb-28' }, filterRoot, folderRoot, chipHint(result.chips.length > 0), chipRoot, none);
+        return h('main', { class: 'max-w-3xl mx-auto p-4 pb-28' }, filterRoot, memoRow, folderRoot, chipHint(result.chips.length > 0), chipRoot, none);
     }
 
     const subFolders = getChildFolders(state.folders, state.currentId);
@@ -544,6 +561,7 @@ function browserView() {
         folders: subFolders,
         onOpen: (id) => { state.currentId = id; render(); },
         onEdit: editFolder,
+        showMemo: state.showFolderMemos,
         reorder: reordering
             ? { onUp: (id) => moveItem('folder', id, -1), onDown: (id) => moveItem('folder', id, 1), onMoveTo: (id, to) => moveItemTo('folder', id, to) }
             : null,
@@ -559,12 +577,15 @@ function browserView() {
     const canReorder = subFolders.length > 1 || chips.length > 1;
     const showReorder = canReorder || reordering;
     const showSwitch = chips.length > 0 && !reordering;
+    // メモの出す/隠すは、並び替え中は出さない（並び替えの行にはメモを出さないため）
+    const memoToggle = reordering ? null : memoToggleFor(subFolders);
     // PC幅では、並べ方の切り替えを「並び替え」の横に並べる。スマホでは、チップの上の案内行に出す。
-    // 「並び替え」が出ないときは、この行はPC幅でだけ出す
-    const reorderToggle = showReorder || showSwitch
-        ? h('div', { class: `${showReorder ? 'flex' : 'hidden sm:flex'} items-center justify-between gap-2 mb-2` },
+    // 「並び替え」もメモのボタンも出ないときは、この行はPC幅でだけ出す
+    const reorderToggle = showReorder || showSwitch || memoToggle
+        ? h('div', { class: `${showReorder || memoToggle ? 'flex' : 'hidden sm:flex'} items-center justify-between gap-2 mb-2` },
             h('p', { class: 'text-xs text-muted' }, reordering ? '長押ししてドラッグ、または ↑↓ で並び替え' : ''),
             h('div', { class: 'flex items-center gap-2' },
+                memoToggle,
                 showSwitch ? h('div', { class: 'hidden sm:block' }, viewSwitch()) : null,
                 showReorder
                     ? h('button', {
