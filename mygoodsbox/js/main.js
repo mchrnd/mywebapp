@@ -321,7 +321,7 @@ function goHome() {
 function modeSwitch() {
     const button = (mode, label) => h('button', {
         type: 'button',
-        class: `px-2.5 py-1 rounded-md text-sm ${state.mode === mode ? 'bg-surface text-primary font-bold' : 'text-white'}`,
+        class: `px-2 sm:px-2.5 py-1 rounded-md text-sm ${state.mode === mode ? 'bg-surface text-primary font-bold' : 'text-white'}`,
         'aria-pressed': state.mode === mode ? 'true' : 'false',
         onClick: () => setMode(mode),
     }, label);
@@ -351,26 +351,27 @@ function headerView() {
             }, 'ログアウト'))
         : null;
     return h('header', { class: 'safe-top bg-primary text-white shadow-md sticky top-0 z-20' },
-        h('div', { class: 'max-w-3xl mx-auto px-4 py-3 flex items-center justify-between' },
+        // 「編集｜確認」を足しても幅320pxのスマホで1行に収まるよう、狭い画面では余白と文字を少し詰める
+        h('div', { class: 'max-w-3xl mx-auto px-3 sm:px-4 py-3 flex items-center justify-between gap-1' },
             h('button', {
                 type: 'button',
-                class: 'flex items-center gap-2 -ml-1 px-1 py-1 rounded-lg hover:bg-primary-dark',
+                class: 'flex items-center gap-1.5 sm:gap-2 -ml-1 px-1 py-1 rounded-lg hover:bg-primary-dark min-w-0',
                 'aria-label': 'ホームへ戻る',
                 onClick: goHome,
             },
-            icon('box', 'w-6 h-6'),
-            h('h1', { class: 'text-lg font-bold' }, 'グッズ管理')),
-            h('div', { class: 'relative flex items-center gap-1' },
+            icon('box', 'w-6 h-6 shrink-0'),
+            h('h1', { class: 'text-base sm:text-lg font-bold whitespace-nowrap' }, 'グッズ管理')),
+            h('div', { class: 'relative flex items-center gap-0.5 sm:gap-1 shrink-0' },
                 modeSwitch(),
                 h('button', {
                     type: 'button',
-                    class: 'w-10 h-10 flex items-center justify-center rounded-full hover:bg-primary-dark',
+                    class: 'w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center rounded-full hover:bg-primary-dark',
                     'aria-label': '操作説明',
                     onClick: (e) => { e.stopPropagation(); state.menuOpen = false; state.fabOpen = false; render(); openHelp(); },
                 }, helpIcon()),
                 h('button', {
                     type: 'button',
-                    class: 'w-10 h-10 flex items-center justify-center rounded-full hover:bg-primary-dark',
+                    class: 'w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center rounded-full hover:bg-primary-dark',
                     'aria-label': 'メニュー',
                     'aria-expanded': state.menuOpen ? 'true' : 'false',
                     onClick: (e) => { e.stopPropagation(); state.menuOpen = !state.menuOpen; state.fabOpen = false; render(); },
