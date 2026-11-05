@@ -107,11 +107,16 @@ function cardView(c, p) {
             ...pressAttrs(c, p),
             class: `no-callout flex-1 min-w-0 flex flex-col p-2.5 ${readOnly ? '' : 'sm:pr-11'} text-left ${pressedLook(readOnly)} ${c.icon ? 'rounded-r-xl' : 'rounded-xl'}`,
         },
-        h('div', { class: 'min-w-0 font-medium truncate' }, c.name),
+        // readOnly（確認モード）では－ボタンがないので、個数は名前と同じ行の右端に置き、段を分けない
+        readOnly
+            ? h('div', { class: 'min-w-0 flex items-center justify-between gap-2' },
+                h('div', { class: 'min-w-0 font-medium truncate' }, c.name),
+                h('div', { class: 'shrink-0 text-lg font-bold text-primary' }, `×${c.count}`))
+            : h('div', { class: 'min-w-0 font-medium truncate' }, c.name),
         subtitle ? subtitleView(c, subtitle, onSubtitleClick) : null,
         p.showTags ? tagPills(c.tags, { wrap: false }) : null,
-        // 個数の行は、カードの高さがそろっても、いつも下（－ボタンの横）に置く
-        h('div', { class: `mt-auto pt-1 ${readOnly ? '' : 'pr-10'} text-lg font-bold text-primary` }, `×${c.count}`)),
+        // 編集モードの個数の行は、カードの高さがそろっても、いつも下（－ボタンの横）に置く
+        readOnly ? null : h('div', { class: 'mt-auto pt-1 pr-10 text-lg font-bold text-primary' }, `×${c.count}`)),
         readOnly ? null : minusButton(c, onMinus, 'absolute bottom-0.5 right-0.5 w-10 h-10'),
         readOnly ? null : pencilButton(c, onEdit, 'hidden sm:flex absolute top-0.5 right-0.5 w-10 h-10'));
 }
